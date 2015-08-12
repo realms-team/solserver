@@ -9,6 +9,12 @@ The server offers a JSON API for managers to report data.
 
 The JSON API is available over HTTP, secured using SSL.
 
+## Security
+
+Mutual authentication using SSL is REQUIRED. Prior to communicating between a basestation and the server:
+* the certificate of the server MUST be installed on the basestation
+* the certificate of the basestation MUST be installed on the server
+
 ## Base URI
 
 The base URI of the JSON API is:
@@ -63,3 +69,5 @@ TODO
 # Web Interface
 
 TODO
+
+
