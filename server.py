@@ -4,9 +4,6 @@
 
 import sys
 import os
-import json
-
-import threading
 
 if __name__ == "__main__":
     here = sys.path[0]
@@ -14,72 +11,88 @@ if __name__ == "__main__":
     
 #============================ imports =========================================
 
-from   optparse                             import OptionParser
+import json
+import threading
+from   optparse import OptionParser
+
+import OpenCli
 
 import bottle
-
 import SolVersion
 import server_version
-import OpenCli
 
 #============================ defines =========================================
 
-DEFAULT_PORT = 8080
+DEFAULT_TCPPORT    = 8080
 
 #============================ body ============================================
 
-class Server(object):
+class Server(threading.Thread):
     
-    def __init__(self,port):
+    def __init__(self,tcpport):
         
-        # local variables
-        self.web = bottle.Bottle()
+        # store params
+        self.tcpport    = tcpport
         
-        # initialize routes
-        self.web.route(path='/api/v1/echo.json',   method='GET', callback=self._webcb_echo_GET)
-        self.web.route(path='/api/v1/status.json', method='GET', callback=self._webcb_status_GET)
-        self.web.route(path='/api/v1/o.json',      method='PUT', callback=self._webcb_o_PUT)
+        # initialize web server
+        self.web        = bottle.Bottle()
+        self.web.route(path='/api/v1/echo.json',   method='GET', callback=self._cb_echo_GET)
+        self.web.route(path='/api/v1/status.json', method='GET', callback=self._cb_status_GET)
+        self.web.route(path='/api/v1/o.json',      method='PUT', callback=self._cb_o_PUT)
         
-        # start web server in separate thread
-        self.webThread = threading.Thread(
-            target = self.web.run,
-            kwargs = {
-                'host'          : 'localhost',
-                'port'          : port,
-                'quiet'         : True,
-                'debug'         : False,
-            }
+        # start the thread
+        threading.Thread.__init__(self)
+        self.name       = 'Server'
+        self.start()
+    
+    def run(self):
+        self.web.run(
+            host   = 'localhost',
+            port   = self.tcpport,
+            quiet  = False,
+            debug  = True,
         )
-        self.webThread.start()
     
     #======================== public ==========================================
     
+    def close(self):
+        print 'TODO Server.close()'
+    
     #======================== private =========================================
     
-    def _webcb_echo_GET(self):
+    #=== JSON request handler
+    
+    def _cb_echo_GET(self):
         bottle.response.status = 501
         bottle.response.content_type = 'application/json'
         return json.dumps({'error': 'Not Implemented yet :-('})
     
-    def _webcb_status_GET(self):
+    def _cb_status_GET(self):
         bottle.response.status = 501
         bottle.response.content_type = 'application/json'
         return json.dumps({'error': 'Not Implemented yet :-('})
     
-    def _webcb_o_PUT(self):
+    def _cb_o_PUT(self):
         bottle.response.status = 501
         bottle.response.content_type = 'application/json'
         return json.dumps({'error': 'Not Implemented yet :-('})
 
 #============================ main ============================================
 
-def quitCallback():
-    print "TODO quitCallback"
+server = None
 
-def main(port):
+def quitCallback():
+    global server
+    
+    server.close()
+
+def main(tcpport):
+    global server
     
     # create the server instance
-    server = Server(port)
+    server = Server(
+        tcpport
+    )
     
     # start the CLI interface
     OpenCli.OpenCli(
@@ -99,15 +112,17 @@ def main(port):
         ],
     )
 
-#============================ main ============================================
-
 if __name__ == '__main__':
     
     # parse the command line
     parser = OptionParser("usage: %prog [options]")
-    parser.add_option("-p", "--port", dest="port", 
-                      default=DEFAULT_PORT,
-                      help="TCP port to listen on")
+    parser.add_option(
+        "-t", "--tcpport", dest="tcpport", 
+        default=DEFAULT_TCPPORT,
+        help="TCP port to start the JSON API on."
+    )
     (options, args) = parser.parse_args()
     
-    main(options.port)
+    main(
+        options.tcpport,
+    )
