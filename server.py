@@ -8,7 +8,7 @@ import os
 if __name__ == "__main__":
     here = sys.path[0]
     sys.path.insert(0, os.path.join(here, '..', 'Sol'))
-    
+
 #============================ imports =========================================
 
 import json
@@ -18,6 +18,7 @@ from   optparse import OptionParser
 import OpenCli
 
 import bottle
+import Sol
 import SolVersion
 import server_version
 
