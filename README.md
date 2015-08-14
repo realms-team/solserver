@@ -107,7 +107,8 @@ One of the following HTTP status codes is returned:
 
 # Database
 
-TODO
+mongoDB, inserting JSON objects to database
+
 
 # Web Interface
 
