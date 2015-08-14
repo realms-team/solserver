@@ -64,16 +64,19 @@ class Server(threading.Thread):
     #=== JSON request handler
     
     def _cb_echo_POST(self):
+        # TODO: implement
         bottle.response.status = 501
         bottle.response.content_type = 'application/json'
         return json.dumps({'error': 'Not Implemented yet :-('})
     
     def _cb_status_GET(self):
+        # TODO: implement
         bottle.response.status = 501
         bottle.response.content_type = 'application/json'
         return json.dumps({'error': 'Not Implemented yet :-('})
     
     def _cb_o_PUT(self):
+        # TODO: implement
         bottle.response.status = 501
         bottle.response.content_type = 'application/json'
         return json.dumps({'error': 'Not Implemented yet :-('})
