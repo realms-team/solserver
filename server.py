@@ -11,7 +11,9 @@ if __name__ == "__main__":
 
 #============================ imports =========================================
 
+import time
 import json
+import subprocess
 import threading
 from   optparse import OptionParser
 
@@ -28,7 +30,31 @@ DEFAULT_TCPPORT    = 8080
 
 #============================ body ============================================
 
+class Stats(object):
+    _instance = None
+    _init     = False
+    def __new__(cls, *args, **kwargs):
+        if not cls._instance:
+            cls._instance = super(Stats,cls).__new__(cls, *args, **kwargs)
+        return cls._instance
+    def __init__(self):
+        if self._init:
+            return
+        self._init    = True
+        self.dataLock = threading.RLock()
+        self.data     = {}
+    def incr(self,statName):
+        with self.dataLock:
+            if statName not in self.data:
+                self.data[statName] = 0
+            self.data[statName] += 1
+    def get(self):
+        with self.dataLock:
+            return self.data.copy()
+
 class Server(threading.Thread):
+    
+    STAT_NUM_REQ_RX = 'NUM_REQ_RX'
     
     def __init__(self,tcpport):
         
@@ -65,21 +91,43 @@ class Server(threading.Thread):
     #=== JSON request handler
     
     def _cb_echo_POST(self):
+        Stats().incr(self.STAT_NUM_REQ_RX)
         bottle.response.content_type = bottle.request.content_type
         return bottle.request.body.read()
     
     def _cb_status_GET(self):
-        # TODO: implement (#2)
-        bottle.response.status = 501
+        Stats().incr(self.STAT_NUM_REQ_RX)
+        
+        returnVal = {}
+        returnVal['version server']   = server_version.VERSION
+        returnVal['version Sol']      = SolVersion.VERSION
+        returnVal['uptime computer']  = self._exec_cmd('uptime')
+        returnVal['utc']              = int(time.time())
+        returnVal['date']             = time.strftime("%a, %d %b %Y %H:%M:%S", time.gmtime())
+        returnVal['last reboot']      = self._exec_cmd('last reboot')
+        returnVal['stats']            = Stats().get()
+        
         bottle.response.content_type = 'application/json'
-        return json.dumps({'error': 'Not Implemented yet :-('})
+        return json.dumps(returnVal)
     
     def _cb_o_PUT(self):
+        Stats().incr(self.STAT_NUM_REQ_RX)
+        
         # TODO: implement (#3)
         bottle.response.status = 501
         bottle.response.content_type = 'application/json'
         return json.dumps({'error': 'Not Implemented yet :-('})
-
+    
+    #=== misc
+    
+    def _exec_cmd(self,cmd):
+        returnVal = None
+        try:
+            returnVal = subprocess.check_output(cmd, shell=False)
+        except:
+            returnVal = "ERROR"
+        return returnVal
+    
 #============================ main ============================================
 
 server = None
@@ -103,15 +151,7 @@ def main(tcpport):
         server_version.VERSION,
         quitCallback,
         [
-            (
-                "Sol",
-                (
-                    SolVersion.SOL_VERSION['SOL_VERSION_MAJOR'],
-                    SolVersion.SOL_VERSION['SOL_VERSION_MINOR'],
-                    SolVersion.SOL_VERSION['SOL_VERSION_PATCH'],
-                    SolVersion.SOL_VERSION['SOL_VERSION_BUILD'],
-                ),
-            ),
+            ("Sol",SolVersion.VERSION),
         ],
     )
 
