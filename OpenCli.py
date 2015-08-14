@@ -85,7 +85,7 @@ class OpenCli(threading.Thread):
         )]
         if self.miscVer:
             for (component,ver) in self.miscVer:
-                banner += ['Using {0} {1}.{2}.{3}.{4}'.format(
+                banner += ['  - using {0} {1}.{2}.{3}.{4}'.format(
                     component,
                     ver[0],ver[1],ver[2],ver[3],
                 )]
