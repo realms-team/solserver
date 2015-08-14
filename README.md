@@ -33,7 +33,7 @@ Only `v1` of the API is defined in this document. Future revisions of this docum
 
 ### verifying connectivity
 
-To verify the API is up and running, one can a `GET` command to the API endpoint:
+To verify the API is up and running, one can a `POST` command to the API endpoint:
 
 ```
 /echo.json

@@ -37,7 +37,7 @@ class Server(threading.Thread):
         
         # initialize web server
         self.web        = bottle.Bottle()
-        self.web.route(path='/api/v1/echo.json',   method='GET', callback=self._cb_echo_GET)
+        self.web.route(path='/api/v1/echo.json',   method='POST',callback=self._cb_echo_POST)
         self.web.route(path='/api/v1/status.json', method='GET', callback=self._cb_status_GET)
         self.web.route(path='/api/v1/o.json',      method='PUT', callback=self._cb_o_PUT)
         
@@ -50,8 +50,8 @@ class Server(threading.Thread):
         self.web.run(
             host   = 'localhost',
             port   = self.tcpport,
-            quiet  = False,
-            debug  = True,
+            quiet  = True,
+            debug  = False,
         )
     
     #======================== public ==========================================
@@ -63,7 +63,7 @@ class Server(threading.Thread):
     
     #=== JSON request handler
     
-    def _cb_echo_GET(self):
+    def _cb_echo_POST(self):
         bottle.response.status = 501
         bottle.response.content_type = 'application/json'
         return json.dumps({'error': 'Not Implemented yet :-('})
