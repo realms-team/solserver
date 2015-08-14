@@ -57,6 +57,7 @@ class Server(threading.Thread):
     #======================== public ==========================================
     
     def close(self):
+        # TODO: implement (#4)
         print 'TODO Server.close()'
     
     #======================== private =========================================
@@ -64,19 +65,19 @@ class Server(threading.Thread):
     #=== JSON request handler
     
     def _cb_echo_POST(self):
-        # TODO: implement
+        # TODO: implement (#1)
         bottle.response.status = 501
         bottle.response.content_type = 'application/json'
         return json.dumps({'error': 'Not Implemented yet :-('})
     
     def _cb_status_GET(self):
-        # TODO: implement
+        # TODO: implement (#2)
         bottle.response.status = 501
         bottle.response.content_type = 'application/json'
         return json.dumps({'error': 'Not Implemented yet :-('})
     
     def _cb_o_PUT(self):
-        # TODO: implement
+        # TODO: implement (#3)
         bottle.response.status = 501
         bottle.response.content_type = 'application/json'
         return json.dumps({'error': 'Not Implemented yet :-('})
