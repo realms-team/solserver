@@ -26,7 +26,7 @@ import server_version
 
 #============================ defines =========================================
 
-DEFAULT_TCPPORT              = 8080
+DEFAULT_TCPPORT              = 8081
 DEFAULT_SERVERTOKEN          = 'DEFAULT_SERVERTOKEN'
 DEFAULT_BASESTATIONTOKEN     = 'DEFAULT_BASESTATIONTOKEN'
 

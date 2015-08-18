@@ -73,10 +73,15 @@ The HTTP reply contains the following body:
 
 ```
 {
-    'software version': '1.0.2.3' 
-    'uptime':           '21:01:36 up 21:49,  2 users,  load average: 0.04, 0.08, 0.05',
-    'date':             'Wed Aug 12 21:02:06 UTC 2015',
-    'last reboot':      'wtmp begins Wed Aug 12 21:01:33 2015',
+    "version server":   [1,0,0,0],
+    "version Sol":      [1,0,0,0],
+    "uptime computer":  "21:01:36 up 21:49,  2 users,  load average: 0.04, 0.08, 0.05",
+    "last reboot":      'wtmp begins Wed Aug 12 21:01:33 2015',
+    "date":             "Tue, 18 Aug 2015 11:57:56"
+    "utc":              1439899076,
+    "stats": {
+        "NUM_REQ_RX":   1
+    },    
 }
 ```
 
