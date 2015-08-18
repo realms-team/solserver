@@ -111,27 +111,41 @@ class Server(threading.Thread):
     #=== JSON request handler
     
     def _cb_echo_POST(self):
-        Stats().incr(self.STAT_NUM_REQ_RX)
-        bottle.response.content_type = bottle.request.content_type
-        return bottle.request.body.read()
+        try:
+            # increment stats
+            Stats().incr(self.STAT_NUM_REQ_RX)
+            
+            bottle.response.content_type = bottle.request.content_type
+            return bottle.request.body.read()
+           
+        except Exception as err:
+            printCrash(self.name)
+            raise
     
     def _cb_status_GET(self):
-        Stats().incr(self.STAT_NUM_REQ_RX)
-        
-        returnVal = {}
-        returnVal['version server']   = server_version.VERSION
-        returnVal['version Sol']      = SolVersion.VERSION
-        returnVal['uptime computer']  = self._exec_cmd('uptime')
-        returnVal['utc']              = int(time.time())
-        returnVal['date']             = time.strftime("%a, %d %b %Y %H:%M:%S", time.gmtime())
-        returnVal['last reboot']      = self._exec_cmd('last reboot')
-        returnVal['stats']            = Stats().get()
-        
-        bottle.response.content_type = 'application/json'
-        return json.dumps(returnVal)
+        try:
+            # increment stats
+            Stats().incr(self.STAT_NUM_REQ_RX)
+            
+            returnVal = {}
+            returnVal['version server']   = server_version.VERSION
+            returnVal['version Sol']      = SolVersion.VERSION
+            returnVal['uptime computer']  = self._exec_cmd('uptime')
+            returnVal['utc']              = int(time.time())
+            returnVal['date']             = time.strftime("%a, %d %b %Y %H:%M:%S", time.gmtime())
+            returnVal['last reboot']      = self._exec_cmd('last reboot')
+            returnVal['stats']            = Stats().get()
+            
+            bottle.response.content_type = 'application/json'
+            return json.dumps(returnVal)
+            
+        except Exception as err:
+            printCrash(self.name)
+            raise
     
     def _cb_o_PUT(self):
         try:
+            # increment stats
             Stats().incr(self.STAT_NUM_REQ_RX)
             
             # abort if not right token
