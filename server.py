@@ -26,7 +26,9 @@ import server_version
 
 #============================ defines =========================================
 
-DEFAULT_TCPPORT    = 8080
+DEFAULT_TCPPORT              = 8080
+DEFAULT_SERVERTOKEN          = 'DEFAULT_SERVERTOKEN'
+DEFAULT_BASESTATIONTOKEN     = 'DEFAULT_BASESTATIONTOKEN'
 
 #============================ helpers =========================================
 
@@ -70,6 +72,11 @@ class Server(threading.Thread):
         
         # store params
         self.tcpport    = tcpport
+        
+        # local variables
+        self.sol                  = Sol.Sol()
+        self.servertoken          = DEFAULT_SERVERTOKEN # TODO: read from file
+        self.basestationtoken     = DEFAULT_BASESTATIONTOKEN # TODO: read from file
         
         # initialize web server
         self.web        = bottle.Bottle()
@@ -127,16 +134,32 @@ class Server(threading.Thread):
         try:
             Stats().incr(self.STAT_NUM_REQ_RX)
             
-            print "TODO _cb_o_PUT"
-            print bottle.request.headers.get('X-REALMS-Token')
-            print bottle.request.json
+            # abort if not right token
+            if bottle.request.headers.get('X-REALMS-Token')!=self.servertoken:
+                bottle.response.status = 401
+                bottle.response.content_type = 'application/json'
+                return json.dumps({'error': 'Unauthorized'})
             
-            # TODO: implement (#3)
-            bottle.response.status = 501
-            bottle.response.content_type = 'application/json'
-            return json.dumps({'error': 'Not Implemented yet :-('})
+            # abort if malformed JSON body
+            if bottle.request.json==None:
+                bottle.response.status = 400
+                bottle.response.content_type = 'application/json'
+                return json.dumps({'error': 'Malformed JSON body'})
+            
+            # parse dicts
+            try:
+                dicts = self.sol.json_to_dicts(bottle.request.json)
+            except:
+                bottle.response.status = 400
+                bottle.response.content_type = 'application/json'
+                return json.dumps({'error': 'Malformed JSON body contents'})
+            
+            # publish contents
+            print 'TODO: _cb_o_PUT publish'
+            
         except Exception as err:
-            print err
+            printCrash(self.name)
+            raise
     
     #=== misc
     
