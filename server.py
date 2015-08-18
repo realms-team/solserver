@@ -28,7 +28,17 @@ import server_version
 
 DEFAULT_TCPPORT    = 8080
 
-#============================ body ============================================
+#============================ helpers =========================================
+
+def printCrash(threadName):
+    import traceback
+    output  = []
+    output += ["CRASH in Thread {0}!".format(threadName)]
+    output += [traceback.format_exc()]
+    output  = '\n'.join(output)
+    print output
+
+#============================ classes =========================================
 
 class Stats(object):
     _instance = None
@@ -73,12 +83,15 @@ class Server(threading.Thread):
         self.start()
     
     def run(self):
-        self.web.run(
-            host   = 'localhost',
-            port   = self.tcpport,
-            quiet  = True,
-            debug  = False,
-        )
+        try:
+            self.web.run(
+                host   = 'localhost',
+                port   = self.tcpport,
+                quiet  = True,
+                debug  = False,
+            )
+        except:
+            printCrash(self.name)
     
     #======================== public ==========================================
     
