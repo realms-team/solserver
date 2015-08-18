@@ -11,7 +11,7 @@ The JSON API is available over HTTP, secured using SSL.
 
 ## Security
 
-Access over HTTPS is REQUIRED (i.e. non-encrypted HTTP access is not allowed). HTTPS ensures that the communication is encrypted. To authenticate, the client connecting to this API MUST provide a token in each JSON API command. This token (a string) is passed as the custom HTTP header `REALMS-Token`.
+Access over HTTPS is REQUIRED (i.e. non-encrypted HTTP access is not allowed). HTTPS ensures that the communication is encrypted. To authenticate, the client connecting to this API MUST provide a token in each JSON API command. This token (a string) is passed as the custom HTTP header `X-REALMS-Token`.
 
 Before taking any action, the server `MUST` verify that this token is authorized, and issue a 401 "Unauthorized" HTTP status code with no body.
 
@@ -46,7 +46,7 @@ One of the following HTTP status codes is returned:
 | Code |               Meaning | Action required                                                             |
 |------|-----------------------|-----------------------------------------------------------------------------|
 | 200  |                    OK | Success. The body contains the same body as the request                     |
-| 401  |          Unauthorized | Invalid `REALMS-Token` passed                                               |
+| 401  |          Unauthorized | Invalid `X-REALMS-Token` passed                                             |
 | 500  | Internal Server Error | Server error. The body MIGHT contain a description.                         |
 
 The body of the reply contains the same contents as the body of the request.
@@ -66,7 +66,7 @@ One of the following HTTP status codes is returned:
 | Code |               Meaning | Action required                                                             |
 |------|-----------------------|-----------------------------------------------------------------------------|
 | 200  |                    OK | Request received successfully, snapshot is started.                         |
-| 401  |          Unauthorized | Invalid `REALMS-Token` passed                                               |
+| 401  |          Unauthorized | Invalid `X-REALMS-Token` passed                                             |
 | 500  | Internal Server Error | Server error. The body MIGHT contain a description.                         |
 
 The HTTP reply contains the following body:
@@ -102,7 +102,7 @@ One of the following HTTP status codes is returned:
 |------|-----------------------|-----------------------------------------------------------------------------|
 | 200  |                    OK | Objects received successfully. Thank you.                                   |
 | 400  |           Bad Request | Something is wrong with your request. The body MIGHT contain a description. |
-| 401  |          Unauthorized | Invalid `REALMS-Token` passed                                               |
+| 401  |          Unauthorized | Invalid `X-REALMS-Token` passed                                             |
 | 500  | Internal Server Error | Server error. The body MIGHT contain a description.                         |
 
 # Database

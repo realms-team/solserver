@@ -124,12 +124,19 @@ class Server(threading.Thread):
         return json.dumps(returnVal)
     
     def _cb_o_PUT(self):
-        Stats().incr(self.STAT_NUM_REQ_RX)
-        
-        # TODO: implement (#3)
-        bottle.response.status = 501
-        bottle.response.content_type = 'application/json'
-        return json.dumps({'error': 'Not Implemented yet :-('})
+        try:
+            Stats().incr(self.STAT_NUM_REQ_RX)
+            
+            print "TODO _cb_o_PUT"
+            print bottle.request.headers.get('X-REALMS-Token')
+            print bottle.request.json
+            
+            # TODO: implement (#3)
+            bottle.response.status = 501
+            bottle.response.content_type = 'application/json'
+            return json.dumps({'error': 'Not Implemented yet :-('})
+        except Exception as err:
+            print err
     
     #=== misc
     
