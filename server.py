@@ -111,6 +111,7 @@ class Server(threading.Thread):
     #=== JSON request handler
     
     def _cb_echo_POST(self):
+        self._authorizeClient()
         try:
             # increment stats
             Stats().incr(self.STAT_NUM_REQ_RX)
@@ -123,6 +124,7 @@ class Server(threading.Thread):
             raise
     
     def _cb_status_GET(self):
+        self._authorizeClient()
         try:
             # increment stats
             Stats().incr(self.STAT_NUM_REQ_RX)
@@ -144,15 +146,10 @@ class Server(threading.Thread):
             raise
     
     def _cb_o_PUT(self):
+        self._authorizeClient()
         try:
             # increment stats
             Stats().incr(self.STAT_NUM_REQ_RX)
-            
-            # abort if not right token
-            if bottle.request.headers.get('X-REALMS-Token')!=self.servertoken:
-                bottle.response.status = 401
-                bottle.response.content_type = 'application/json'
-                return json.dumps({'error': 'Unauthorized'})
             
             # abort if malformed JSON body
             if bottle.request.json==None:
@@ -176,6 +173,14 @@ class Server(threading.Thread):
             raise
     
     #=== misc
+    
+    def _authorizeClient(self):
+        if bottle.request.headers.get('X-REALMS-Token')!=self.servertoken:
+            raise bottle.HTTPResponse(
+                body   = json.dumps({'error': 'Unauthorized'}),
+                status = 401,
+                headers= {'Content-Type': 'application/json'},
+            )
     
     def _exec_cmd(self,cmd):
         returnVal = None
