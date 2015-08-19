@@ -87,6 +87,7 @@ class Server(threading.Thread):
         # start the thread
         threading.Thread.__init__(self)
         self.name       = 'Server'
+        self.daemon     = True
         self.start()
     
     def run(self):
@@ -103,8 +104,8 @@ class Server(threading.Thread):
     #======================== public ==========================================
     
     def close(self):
-        # TODO: implement (#4)
-        print 'TODO Server.close()'
+        # bottle thread is daemon, it will close when main thread closes
+        pass
     
     #======================== private =========================================
     
@@ -153,20 +154,24 @@ class Server(threading.Thread):
             
             # abort if malformed JSON body
             if bottle.request.json==None:
-                bottle.response.status = 400
-                bottle.response.content_type = 'application/json'
-                return json.dumps({'error': 'Malformed JSON body'})
+                raise bottle.HTTPResponse(
+                    body   = json.dumps({'error': 'Malformed JSON body'}),
+                    status = 400,
+                    headers= {'Content-Type': 'application/json'},
+                )
             
             # parse dicts
             try:
                 dicts = self.sol.json_to_dicts(bottle.request.json)
             except:
-                bottle.response.status = 400
-                bottle.response.content_type = 'application/json'
-                return json.dumps({'error': 'Malformed JSON body contents'})
+                raise bottle.HTTPResponse(
+                    body   = json.dumps({'error': 'Malformed JSON body contents'}),
+                    status = 400,
+                    headers= {'Content-Type': 'application/json'},
+                )
             
             # publish contents
-            print 'TODO: _cb_o_PUT publish'
+            print 'TODO: _cb_o_PUT publish {0} objects'.format(len(dicts))
             
         except Exception as err:
             printCrash(self.name)
