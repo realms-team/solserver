@@ -11,6 +11,7 @@ if __name__ == "__main__":
 
 #============================ imports =========================================
 
+import pickle
 import time
 import json
 import subprocess
@@ -27,6 +28,9 @@ import server_version
 #============================ defines =========================================
 
 DEFAULT_TCPPORT              = 8081
+
+DEFAULT_BACKUPFILE           = 'server.backup'
+# config file
 DEFAULT_SERVERTOKEN          = 'DEFAULT_SERVERTOKEN'
 DEFAULT_BASESTATIONTOKEN     = 'DEFAULT_BASESTATIONTOKEN'
 
@@ -42,27 +46,52 @@ def printCrash(threadName):
 
 #============================ classes =========================================
 
-class Stats(object):
+class AppData(object):
     _instance = None
     _init     = False
     def __new__(cls, *args, **kwargs):
         if not cls._instance:
-            cls._instance = super(Stats,cls).__new__(cls, *args, **kwargs)
+            cls._instance = super(AppData,cls).__new__(cls, *args, **kwargs)
         return cls._instance
     def __init__(self):
         if self._init:
             return
-        self._init    = True
-        self.dataLock = threading.RLock()
-        self.data     = {}
-    def incr(self,statName):
+        self._init      = True
+        self.dataLock   = threading.RLock()
+        try:
+            with open(DEFAULT_BACKUPFILE,'r') as f:
+                self.data = pickle.load(f)
+        except:
+            self.data = {
+                'stats' : {},
+                'config' : {
+                    'servertoken':          DEFAULT_SERVERTOKEN,
+                    'basestationtoken':     DEFAULT_BASESTATIONTOKEN,
+                },
+            }
+            self._backupData()
+    def incrStats(self,statName):
         with self.dataLock:
-            if statName not in self.data:
-                self.data[statName] = 0
-            self.data[statName] += 1
-    def get(self):
+            if statName not in self.data['stats']:
+                self.data['stats'][statName] = 0
+            self.data['stats'][statName] += 1
+    def getStats(self):
         with self.dataLock:
-            return self.data.copy()
+            return self.data['stats'].copy()
+    def getConfig(self,key):
+        with self.dataLock:
+            return self.data['config'][key]
+    def getAllConfig(self):
+        with self.dataLock:
+            return self.data['config'].copy()
+    def setConfig(self,key,value):
+        with self.dataLock:
+            self.data['config'][key] = value
+        self._backupData()
+    def _backupData(self):
+        with self.dataLock:
+            with open(DEFAULT_BACKUPFILE,'w') as f:
+                pickle.dump(self.data,f)
 
 class Server(threading.Thread):
     
@@ -74,6 +103,7 @@ class Server(threading.Thread):
         self.tcpport    = tcpport
         
         # local variables
+        AppData()
         self.sol                  = Sol.Sol()
         self.servertoken          = DEFAULT_SERVERTOKEN # TODO: read from file
         self.basestationtoken     = DEFAULT_BASESTATIONTOKEN # TODO: read from file
@@ -115,7 +145,7 @@ class Server(threading.Thread):
         self._authorizeClient()
         try:
             # increment stats
-            Stats().incr(self.STAT_NUM_REQ_RX)
+            AppData().incrStats(self.STAT_NUM_REQ_RX)
             
             bottle.response.content_type = bottle.request.content_type
             return bottle.request.body.read()
@@ -128,7 +158,7 @@ class Server(threading.Thread):
         self._authorizeClient()
         try:
             # increment stats
-            Stats().incr(self.STAT_NUM_REQ_RX)
+            AppData().incrStats(self.STAT_NUM_REQ_RX)
             
             returnVal = {}
             returnVal['version server']   = server_version.VERSION
@@ -137,7 +167,7 @@ class Server(threading.Thread):
             returnVal['utc']              = int(time.time())
             returnVal['date']             = time.strftime("%a, %d %b %Y %H:%M:%S", time.gmtime())
             returnVal['last reboot']      = self._exec_cmd('last reboot')
-            returnVal['stats']            = Stats().get()
+            returnVal['stats']            = AppData().getStats()
             
             bottle.response.content_type = 'application/json'
             return json.dumps(returnVal)
@@ -150,7 +180,7 @@ class Server(threading.Thread):
         self._authorizeClient()
         try:
             # increment stats
-            Stats().incr(self.STAT_NUM_REQ_RX)
+            AppData().incrStats(self.STAT_NUM_REQ_RX)
             
             # abort if malformed JSON body
             if bottle.request.json==None:
