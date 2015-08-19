@@ -38,7 +38,7 @@ DEFAULT_BASESTATIONTOKEN     = 'DEFAULT_BASESTATIONTOKEN'
 
 # stats
 STAT_NUM_JSON_REQ            = 'NUM_JSON_REQ'
-STAT_NUM_JSON_UNAUTHORIZED   = 'NUM_OBJECTS_PUBLISHED'
+STAT_NUM_JSON_UNAUTHORIZED   = 'NUM_JSON_UNAUTHORIZED'
 STAT_NUM_CRASHES             = 'NUM_CRASHES'
 STAT_NUM_OBJECTS_PUBLISHED   = 'NUM_OBJECTS_PUBLISHED'
 
@@ -184,7 +184,7 @@ class Server(threading.Thread):
             # update stats
             AppData().incrStats(STAT_NUM_JSON_REQ)
             
-            # authrorize the client
+            # authorize the client
             self._authorizeClient()
             
             bottle.response.content_type = bottle.request.content_type
@@ -199,7 +199,7 @@ class Server(threading.Thread):
             # update stats
             AppData().incrStats(STAT_NUM_JSON_REQ)
             
-            # authrorize the client
+            # authorize the client
             self._authorizeClient()
             
             returnVal = {}
@@ -223,7 +223,7 @@ class Server(threading.Thread):
             # update stats
             AppData().incrStats(STAT_NUM_JSON_REQ)
             
-            # authrorize the client
+            # authorize the client
             self._authorizeClient()
             
             # abort if malformed JSON body
