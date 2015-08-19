@@ -93,6 +93,23 @@ class AppData(object):
             with open(DEFAULT_BACKUPFILE,'w') as f:
                 pickle.dump(self.data,f)
 
+class CherryPySSL(bottle.ServerAdapter):
+    # to generate a certificate/private_key using OpenSSL:
+    # openssl genrsa -out server.ppk 1024
+    # openssl req -new -x509 -key server.ppk -out server.cert -days 1825
+    def run(self, handler):
+        from cherrypy import wsgiserver
+        from cherrypy.wsgiserver.ssl_pyopenssl import pyOpenSSLAdapter
+        server = wsgiserver.CherryPyWSGIServer((self.host, self.port), handler)
+        server.ssl_adapter = pyOpenSSLAdapter(
+            certificate           = "server.cert",
+            private_key           = "server.ppk",
+        )
+        try:
+            server.start()
+        finally:
+            server.stop()
+
 class Server(threading.Thread):
     
     STAT_NUM_REQ_RX = 'NUM_REQ_RX'
@@ -110,6 +127,7 @@ class Server(threading.Thread):
         
         # initialize web server
         self.web        = bottle.Bottle()
+        #self.web.route(path='/',                   method='GET', callback=self._cb_root_GET)
         self.web.route(path='/api/v1/echo.json',   method='POST',callback=self._cb_echo_POST)
         self.web.route(path='/api/v1/status.json', method='GET', callback=self._cb_status_GET)
         self.web.route(path='/api/v1/o.json',      method='PUT', callback=self._cb_o_PUT)
@@ -125,6 +143,7 @@ class Server(threading.Thread):
             self.web.run(
                 host   = 'localhost',
                 port   = self.tcpport,
+                server = CherryPySSL,
                 quiet  = True,
                 debug  = False,
             )
@@ -140,6 +159,9 @@ class Server(threading.Thread):
     #======================== private =========================================
     
     #=== JSON request handler
+    
+    def _cb_root_GET(self):
+        return 'It works!'
     
     def _cb_echo_POST(self):
         self._authorizeClient()

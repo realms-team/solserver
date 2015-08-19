@@ -1,2 +1,4 @@
 *.pyc
 /server.backup
+/server.cert
+/server.ppk

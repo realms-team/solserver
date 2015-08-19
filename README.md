@@ -3,7 +3,17 @@ This repo contains the software to run on the server. This server:
 * stores that data in a database
 * runs a web interface for users to see sensor/health data
 
-# JSON API
+# Installing and Running
+
+* download a release of this repo as well as a release from the https://github.com/realms-team/sol repo side by side
+* Generate a private key `server.ppk` and associated (self-signed) certification `server.cert` for SSL protection:
+    * `openssl genrsa -out server.ppk 1024`
+    * `openssl req -new -x509 -key server.ppk -out server.cert -days 1825` (you MUST enter the hostname in the entry "Common Name")
+* place both `server.ppk` and `server.cert` files in the `server-sw` directory
+* copy `server.cert` in the `basestation-fw` directory as well
+* double-click/run on `server.py` to start the server
+
+# JSON API documentation
 
 The server offers a JSON API for managers to report data.
 
@@ -113,7 +123,6 @@ One of the following HTTP status codes is returned:
 # Database
 
 mongoDB, inserting JSON objects to database
-
 
 # Web Interface
 
