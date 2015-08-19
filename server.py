@@ -30,20 +30,38 @@ import server_version
 
 DEFAULT_TCPPORT              = 8081
 
+DEFAULT_CRASHLOG             = 'server.crashlog'
 DEFAULT_BACKUPFILE           = 'server.backup'
 # config file
 DEFAULT_SERVERTOKEN          = 'DEFAULT_SERVERTOKEN'
 DEFAULT_BASESTATIONTOKEN     = 'DEFAULT_BASESTATIONTOKEN'
 
+# stats
+STAT_NUM_JSON_REQ            = 'NUM_JSON_REQ'
+STAT_NUM_JSON_UNAUTHORIZED   = 'NUM_OBJECTS_PUBLISHED'
+STAT_NUM_CRASHES             = 'NUM_CRASHES'
+STAT_NUM_OBJECTS_PUBLISHED   = 'NUM_OBJECTS_PUBLISHED'
+
 #============================ helpers =========================================
 
-def printCrash(threadName):
-    import traceback
+def logCrash(threadName,err):
     output  = []
+    output += ["==============================================================="]
+    output += [time.strftime("%m/%d/%Y %H:%M:%S UTC",time.gmtime())]
+    output += [""]
     output += ["CRASH in Thread {0}!".format(threadName)]
+    output += [""]
+    output += ["=== exception type ==="]
+    output += [str(type(err))]
+    output += [""]
+    output += ["=== traceback ==="]
     output += [traceback.format_exc()]
     output  = '\n'.join(output)
+    # update stats
+    AppData().incrStats(STAT_NUM_CRASHES)
     print output
+    with open(DEFAULT_CRASHLOG,'a') as f:
+        f.write(output)
 
 #============================ classes =========================================
 
@@ -71,11 +89,11 @@ class AppData(object):
                 },
             }
             self._backupData()
-    def incrStats(self,statName):
+    def incrStats(self,statName,step=1):
         with self.dataLock:
             if statName not in self.data['stats']:
                 self.data['stats'][statName] = 0
-            self.data['stats'][statName] += 1
+            self.data['stats'][statName] += step
     def getStats(self):
         with self.dataLock:
             return self.data['stats'].copy()
@@ -109,8 +127,6 @@ class CherryPySSL(bottle.ServerAdapter):
             server.stop()
 
 class Server(threading.Thread):
-    
-    STAT_NUM_REQ_RX = 'NUM_REQ_RX'
     
     def __init__(self,tcpport):
         
@@ -164,10 +180,12 @@ class Server(threading.Thread):
         return 'It works!'
     
     def _cb_echo_POST(self):
-        self._authorizeClient()
         try:
-            # increment stats
-            AppData().incrStats(self.STAT_NUM_REQ_RX)
+            # update stats
+            AppData().incrStats(STAT_NUM_JSON_REQ)
+            
+            # authrorize the client
+            self._authorizeClient()
             
             bottle.response.content_type = bottle.request.content_type
             return bottle.request.body.read()
@@ -177,10 +195,12 @@ class Server(threading.Thread):
             raise
     
     def _cb_status_GET(self):
-        self._authorizeClient()
         try:
-            # increment stats
-            AppData().incrStats(self.STAT_NUM_REQ_RX)
+            # update stats
+            AppData().incrStats(STAT_NUM_JSON_REQ)
+            
+            # authrorize the client
+            self._authorizeClient()
             
             returnVal = {}
             returnVal['version server']   = server_version.VERSION
@@ -199,10 +219,12 @@ class Server(threading.Thread):
             raise
     
     def _cb_o_PUT(self):
-        self._authorizeClient()
         try:
-            # increment stats
-            AppData().incrStats(self.STAT_NUM_REQ_RX)
+            # update stats
+            AppData().incrStats(STAT_NUM_JSON_REQ)
+            
+            # authrorize the client
+            self._authorizeClient()
             
             # abort if malformed JSON body
             if bottle.request.json==None:
@@ -223,6 +245,7 @@ class Server(threading.Thread):
                 )
             
             # publish contents
+            AppData().incrStats(STAT_NUM_OBJECTS_PUBLISHED,len(dicts))
             self.mongoCollection.insert_many(dicts)
             
         except Exception as err:
@@ -233,6 +256,7 @@ class Server(threading.Thread):
     
     def _authorizeClient(self):
         if bottle.request.headers.get('X-REALMS-Token')!=self.servertoken:
+            AppData().incrStats(STAT_NUM_JSON_UNAUTHORIZED)
             raise bottle.HTTPResponse(
                 body   = json.dumps({'error': 'Unauthorized'}),
                 status = 401,
@@ -256,6 +280,14 @@ def quitCallback():
     
     server.close()
 
+def cli_cb_stats(params):
+    stats = AppData().getStats()
+    output = []
+    for k in sorted(stats.keys()):
+        output += ['{0:<30}: {1}'.format(k,stats[k])]
+    output = '\n'.join(output)
+    print output
+
 def main(tcpport):
     global server
     
@@ -265,13 +297,20 @@ def main(tcpport):
     )
     
     # start the CLI interface
-    OpenCli.OpenCli(
+    cli = OpenCli.OpenCli(
         "Server",
         server_version.VERSION,
         quitCallback,
         [
             ("Sol",SolVersion.VERSION),
         ],
+    )
+    cli.registerCommand(
+        'stats',
+        's',
+        'print the stats',
+        [],
+        cli_cb_stats
     )
 
 if __name__ == '__main__':
