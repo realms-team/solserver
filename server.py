@@ -94,9 +94,6 @@ class AppData(object):
                 pickle.dump(self.data,f)
 
 class CherryPySSL(bottle.ServerAdapter):
-    # to generate a certificate/private_key using OpenSSL:
-    # openssl genrsa -out server.ppk 1024
-    # openssl req -new -x509 -key server.ppk -out server.cert -days 1825
     def run(self, handler):
         from cherrypy import wsgiserver
         from cherrypy.wsgiserver.ssl_pyopenssl import pyOpenSSLAdapter
