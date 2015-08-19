@@ -18,9 +18,10 @@ import subprocess
 import threading
 from   optparse import OptionParser
 
-import OpenCli
-
+import pymongo
 import bottle
+
+import OpenCli
 import Sol
 import SolVersion
 import server_version
@@ -121,6 +122,8 @@ class Server(threading.Thread):
         self.sol                  = Sol.Sol()
         self.servertoken          = DEFAULT_SERVERTOKEN # TODO: read from file
         self.basestationtoken     = DEFAULT_BASESTATIONTOKEN # TODO: read from file
+        self.mongoClient          = pymongo.MongoClient()
+        self.mongoCollection      = self.mongoClient['realms']['objects']
         
         # initialize web server
         self.web        = bottle.Bottle()
@@ -220,7 +223,7 @@ class Server(threading.Thread):
                 )
             
             # publish contents
-            print 'TODO: _cb_o_PUT publish {0} objects'.format(len(dicts))
+            self.mongoCollection.insert_many(dicts)
             
         except Exception as err:
             printCrash(self.name)

@@ -11,6 +11,7 @@ This repo contains the software to run on the server. This server:
     * `openssl req -new -x509 -key server.ppk -out server.cert -days 1825` (you MUST enter the hostname in the entry "Common Name")
 * place both `server.ppk` and `server.cert` files in the `server-sw` directory
 * copy `server.cert` in the `basestation-fw` directory as well
+* make sure MongoDB is running on your computer
 * double-click/run on `server.py` to start the server
 
 # JSON API documentation
