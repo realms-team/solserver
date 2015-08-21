@@ -16,6 +16,7 @@ import time
 import json
 import subprocess
 import threading
+import traceback
 from   optparse import OptionParser
 
 import pymongo
@@ -163,8 +164,8 @@ class Server(threading.Thread):
                 quiet  = True,
                 debug  = False,
             )
-        except:
-            printCrash(self.name)
+        except Exception as err:
+            logCrash(self.name,err)
     
     #======================== public ==========================================
     
@@ -191,7 +192,7 @@ class Server(threading.Thread):
             return bottle.request.body.read()
            
         except Exception as err:
-            printCrash(self.name)
+            logCrash(self.name,err)
             raise
     
     def _cb_status_GET(self):
@@ -215,7 +216,7 @@ class Server(threading.Thread):
             return json.dumps(returnVal)
             
         except Exception as err:
-            printCrash(self.name)
+            logCrash(self.name,err)
             raise
     
     def _cb_o_PUT(self):
@@ -249,7 +250,7 @@ class Server(threading.Thread):
             self.mongoCollection.insert_many(dicts)
             
         except Exception as err:
-            printCrash(self.name)
+            logCrash(self.name,err)
             raise
     
     #=== misc
