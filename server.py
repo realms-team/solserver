@@ -41,7 +41,8 @@ DEFAULT_BASESTATIONTOKEN     = 'DEFAULT_BASESTATIONTOKEN'
 STAT_NUM_JSON_REQ            = 'NUM_JSON_REQ'
 STAT_NUM_JSON_UNAUTHORIZED   = 'NUM_JSON_UNAUTHORIZED'
 STAT_NUM_CRASHES             = 'NUM_CRASHES'
-STAT_NUM_OBJECTS_PUBLISHED   = 'NUM_OBJECTS_PUBLISHED'
+STAT_NUM_OBJECTS_DB_OK       = 'STAT_NUM_OBJECTS_DB_OK'
+STAT_NUM_OBJECTS_DB_FAIL     = 'STAT_NUM_OBJECTS_DB_FAIL'
 
 #============================ helpers =========================================
 
@@ -246,8 +247,13 @@ class Server(threading.Thread):
                 )
             
             # publish contents
-            AppData().incrStats(STAT_NUM_OBJECTS_PUBLISHED,len(dicts))
-            self.mongoCollection.insert_many(dicts)
+            try:
+                self.mongoCollection.insert_many(dicts)
+            except:
+                AppData().incrStats(STAT_NUM_OBJECTS_DB_FAIL,len(dicts))
+                raise
+            else:
+                AppData().incrStats(STAT_NUM_OBJECTS_DB_OK,len(dicts))
             
         except Exception as err:
             logCrash(self.name,err)
