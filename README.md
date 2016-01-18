@@ -20,6 +20,9 @@ The server offers a JSON API for managers to report data.
 
 The JSON API is available over HTTP, secured using SSL.
 
+Notes: If you want to access the data manually, you need to forge HTTP messages. You can use a plugin
+such as [PostMan](http://www.getpostman.com).
+
 ## Security
 
 Access over HTTPS is REQUIRED (i.e. non-encrypted HTTP access is not allowed). HTTPS ensures that the communication is encrypted. To authenticate, the client connecting to this API MUST provide a token in each JSON API command. This token (a string) is passed as the custom HTTP header `X-REALMS-Token`.
@@ -123,7 +126,22 @@ One of the following HTTP status codes is returned:
 
 # Database
 
-mongoDB, inserting JSON objects to database
+The script uses a mongoDB data on which it will insert JSON objects.
+If a database called "realms" does not exists, it will be created.
+
+The data can be obtained either from shell or via the REST API.
+
+## Shell
+* Run the mongo script (Ex: C:\mongodb\bin\mongod.exe or /usr/bin/mongo)
+* Select the database: ``use realms``
+* List all the documents in the *object* collection: ``db.objects.find()``
+
+## REST
+* Enable the REST API when starting the mongodb deamon (use ``--rest``)
+* Query the server: http://\<server_ip\>:\<REST_port\> (Ex: http://localhost:28017/realms/objects/)
+
+Note: To enable the REST API at statup in Linux, add the following line to the mongodb
+configuration: `rest = true`.
 
 # Web Interface
 
