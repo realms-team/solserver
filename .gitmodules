@@ -1,0 +1,3 @@
+[submodule "smartmeshsdk"]
+	path = smartmeshsdk
+	url = https://github.com/dustcloud/smartmeshsdk.git
