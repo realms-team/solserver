@@ -261,6 +261,11 @@ class Server(threading.Thread):
                     status = 400,
                     headers= {'Content-Type': 'application/json'},
                 )
+            
+            # parse objects values
+            objs = []
+            for obj in dicts:
+                self.sol.parse_value(obj['type'],obj['value'])
 
             # publish contents
             try:
