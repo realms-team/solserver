@@ -263,9 +263,8 @@ class Server(threading.Thread):
                 )
             
             # parse objects values
-            objs = []
             for obj in dicts:
-                self.sol.parse_value(obj['type'],obj['value'])
+                obj['value'] = self.sol.parse_value(obj['type'],*obj['value'])
 
             # publish contents
             try:
