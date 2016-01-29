@@ -5,7 +5,7 @@ This repo contains the software to run on the server. This server:
 
 # Installing and Running
 
-* download a release of this repo as well as a release from the https://github.com/realms-team/sol repo side by side
+* download a release of this repo as well as a release from the https://github.com/realms-team/sol repo side-by-side
 * Generate a private key `server.ppk` and associated (self-signed) certification `server.cert` for SSL protection:
     * `openssl genrsa -out server.ppk 1024`
     * `openssl req -new -x509 -key server.ppk -out server.cert -days 1825` (you MUST enter the hostname in the entry "Common Name")
@@ -31,7 +31,7 @@ Before taking any action, the server `MUST` verify that this token is authorized
 
 ## Compression
 
-The basestation MAY compress the HTTP body before sending it to the server, resulting in reduce bandwidth utilization. When doing so, the basestation MUST use the `gzip` utility and add the `Content-Encoding: gzip` HTTP header to the request.
+The basestation MAY compress the HTTP body before sending it to the server, resulting in reduced bandwidth utilization. When doing so, the basestation MUST use the `gzip` utility and add the `Content-Encoding: gzip` HTTP header to the request.
 
 ## Base URI
 
