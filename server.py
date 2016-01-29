@@ -166,8 +166,8 @@ class Server(threading.Thread):
                 debug  = False,
             )
         
-        except bottle.BottleException as be:
-            bottle.abort(be.status, be.body)
+        except bottle.BottleException as err:
+            bottle.abort(err.status, err.body)
 
         except Exception as err:
             logCrash(self.name,err)
@@ -223,8 +223,8 @@ class Server(threading.Thread):
             bottle.response.content_type = 'application/json'
             return json.dumps(returnVal)
         
-        except bottle.BottleException as be:
-            bottle.abort(be.status, be.body)
+        except bottle.BottleException as err:
+            bottle.abort(err.status, err.body)
 
         except Exception as err:
             logCrash(self.name,err)
