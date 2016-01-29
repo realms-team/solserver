@@ -197,7 +197,7 @@ class Server(threading.Thread):
             return bottle.request.body.read()
         
         except bottle.BottleException as be:
-            bottle.abort(be.status, be.body)
+            raise
            
         except Exception as err:
             logCrash(self.name,err)
@@ -222,9 +222,9 @@ class Server(threading.Thread):
             
             bottle.response.content_type = 'application/json'
             return json.dumps(returnVal)
-        
+
         except bottle.BottleException as err:
-            bottle.abort(err.status, err.body)
+            raise
 
         except Exception as err:
             logCrash(self.name,err)
@@ -245,7 +245,7 @@ class Server(threading.Thread):
                     status = 400,
                     headers= {'Content-Type': 'application/json'},
                 )
-            
+
             # parse dicts
             try:
                 dicts = self.sol.json_to_dicts(bottle.request.json)
@@ -255,7 +255,7 @@ class Server(threading.Thread):
                     status = 400,
                     headers= {'Content-Type': 'application/json'},
                 )
-            
+
             # publish contents
             try:
                 self.mongoCollection.insert_many(dicts)
@@ -264,10 +264,10 @@ class Server(threading.Thread):
                 raise
             else:
                 AppData().incrStats(STAT_NUM_OBJECTS_DB_OK,len(dicts))
-        
+
         except bottle.BottleException as err:
-            bottle.abort(err.status, err.body)
-            
+            raise
+
         except Exception as err:
             logCrash(self.name,err)
             raise
