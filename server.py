@@ -17,7 +17,8 @@ import json
 import subprocess
 import threading
 import traceback
-from   optparse import OptionParser
+from   optparse                 import OptionParser
+from   ConfigParser             import SafeConfigParser
 
 import pymongo
 import bottle
@@ -30,12 +31,16 @@ import server_version
 #============================ defines =========================================
 
 DEFAULT_TCPPORT              = 8081
+DEFAULT_SERVERHOST           = '0.0.0.0' # listten on all interfaces
 
+DEFAULT_CONFIGFILE           = 'server.config'
 DEFAULT_CRASHLOG             = 'server.crashlog'
 DEFAULT_BACKUPFILE           = 'server.backup'
 # config file
 DEFAULT_SERVERTOKEN          = 'DEFAULT_SERVERTOKEN'
 DEFAULT_BASESTATIONTOKEN     = 'DEFAULT_BASESTATIONTOKEN'
+DEFAULT_SERVERCERT           = 'server.cert'
+DEFAULT_SERVERPRIVKEY        = 'server.ppk'
 
 # stats
 STAT_NUM_JSON_REQ            = 'NUM_JSON_REQ'
@@ -120,8 +125,8 @@ class CherryPySSL(bottle.ServerAdapter):
         from cherrypy.wsgiserver.ssl_pyopenssl import pyOpenSSLAdapter
         server = wsgiserver.CherryPyWSGIServer((self.host, self.port), handler)
         server.ssl_adapter = pyOpenSSLAdapter(
-            certificate           = "server.cert",
-            private_key           = "server.ppk",
+            certificate           = DEFAULT_SERVERCERT,
+            private_key           = DEFAULT_SERVERPRIVKEY,
         )
         try:
             server.start()
@@ -138,8 +143,8 @@ class Server(threading.Thread):
         # local variables
         AppData()
         self.sol                  = Sol.Sol()
-        self.servertoken          = DEFAULT_SERVERTOKEN # TODO: read from file
-        self.basestationtoken     = DEFAULT_BASESTATIONTOKEN # TODO: read from file
+        self.servertoken          = DEFAULT_SERVERTOKEN
+        self.basestationtoken     = DEFAULT_BASESTATIONTOKEN
         self.mongoClient          = pymongo.MongoClient()
         self.mongoCollection      = self.mongoClient['realms']['objects']
         
@@ -159,7 +164,7 @@ class Server(threading.Thread):
     def run(self):
         try:
             self.web.run(
-                host   = 'localhost',
+                host   = DEFAULT_SERVERHOST,
                 port   = self.tcpport,
                 server = CherryPySSL,
                 quiet  = True,
@@ -334,7 +339,30 @@ def main(tcpport):
     )
 
 if __name__ == '__main__':
-    
+    # parse the config file
+    cf_parser = SafeConfigParser()
+    cf_parser.read(DEFAULT_CONFIGFILE) 
+
+    if cf_parser.has_section('basestation'):
+        if cf_parser.has_option('basestation','token'):
+            DEFAULT_BASESTATIONTOKEN = cf_parser.get('basestation','token')
+
+    if cf_parser.has_section('server'):
+        if cf_parser.has_option('server','host'):
+            DEFAULT_SERVER = cf_parser.get('server','host')
+        if cf_parser.has_option('server','tcpport'):
+            DEFAULT_TCPPORT = cf_parser.getint('server','tcpport')
+        if cf_parser.has_option('server','token'):
+            DEFAULT_SERVERTOKEN = cf_parser.get('server','token')
+        if cf_parser.has_option('server','certfile'):
+            DEFAULT_SERVERCERT = cf_parser.get('server','certfile')
+        if cf_parser.has_option('server','privatekey'):
+            DEFAULT_SERVERPRIVKEY = cf_parser.get('server','privatekey')
+        if cf_parser.has_option('server','crashlogfile'):
+            DEFAULT_CRASHLOG = cf_parser.get('server','crashlogfile')
+        if cf_parser.has_option('server','backupfile'):
+            DEFAULT_BACKUPFILE = cf_parser.get('server','backupfile')
+
     # parse the command line
     parser = OptionParser("usage: %prog [options]")
     parser.add_option(

@@ -1,5 +1,6 @@
 *.pyc
 /server.backup
+/server.config
 /server.cert
 /server.ppk
 /basestation.cert
