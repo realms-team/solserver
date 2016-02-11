@@ -1,9 +1,7 @@
 #!/usr/bin/python
 
-import sys
 import threading
 import logging
-import binascii
 import time
 from   datetime import timedelta
 
@@ -231,6 +229,7 @@ class OpenCli(threading.Thread):
     
     def _handleQuit(self,params):
         
+        print params
         # call the quit callback
         self.quit_cb()
         
