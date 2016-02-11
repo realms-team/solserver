@@ -301,8 +301,6 @@ class Server(threading.Thread):
 server = None
 
 def quitCallback():
-    global server
-    
     server.close()
 
 def cli_cb_stats(params):
