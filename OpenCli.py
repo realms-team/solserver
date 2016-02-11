@@ -229,7 +229,6 @@ class OpenCli(threading.Thread):
     
     def _handleQuit(self,params):
         
-        print params
         # call the quit callback
         self.quit_cb()
         
