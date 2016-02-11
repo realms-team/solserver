@@ -1,3 +1,5 @@
+[![Code Health](https://landscape.io/github/realms-team/server-sw/master/landscape.svg?style=flat)](https://landscape.io/github/realms-team/server-sw/master)
+
 This repo contains the software to run on the server. This server:
 * runs a JSON API for managers in the field to report data
 * stores that data in a database
