@@ -1,4 +1,4 @@
-Copyright (c) 2016, Regent of Inria and the University of California.
+Copyright (c) 2016, Inria and Regent of the University of California.
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
