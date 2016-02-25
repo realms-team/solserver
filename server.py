@@ -20,7 +20,8 @@ import traceback
 from   optparse                 import OptionParser
 from   ConfigParser             import SafeConfigParser
 
-import pymongo
+import influxdb
+#import pymongo
 import bottle
 
 import OpenCli
@@ -145,8 +146,13 @@ class Server(threading.Thread):
         self.sol                  = Sol.Sol()
         self.servertoken          = DEFAULT_SERVERTOKEN
         self.basestationtoken     = DEFAULT_BASESTATIONTOKEN
-        self.mongoClient          = pymongo.MongoClient()
-        self.mongoCollection      = self.mongoClient['realms']['objects']
+        self.influxClient         = influxdb.client.InfluxDBClient(
+                                            host='localhost',
+                                            port='8086',
+                                            database='realms'
+                                        )
+        #self.mongoClient          = pymongo.MongoClient()
+        #self.mongoCollection      = self.mongoClient['realms']['objects']
         
         # initialize web server
         self.web        = bottle.Bottle()
@@ -254,7 +260,7 @@ class Server(threading.Thread):
             # parse dicts
             try:
                 dicts = self.sol.json_to_dicts(bottle.request.json)
-            except:
+            except bottle.BottleException:
                 raise bottle.HTTPResponse(
                     body   = json.dumps({'error': 'Malformed JSON body contents'}),
                     status = 400,
@@ -267,15 +273,16 @@ class Server(threading.Thread):
 
             # publish contents
             try:
-                self.mongoCollection.insert_many(dicts)
+                self.influxClient.write_points(dicts)
+                #self.mongoCollection.insert_many(dicts)
             except:
                 AppData().incrStats(STAT_NUM_OBJECTS_DB_FAIL,len(dicts))
                 raise
             else:
                 AppData().incrStats(STAT_NUM_OBJECTS_DB_OK,len(dicts))
 
-        except bottle.BottleException:
-            raise
+        #except bottle.BottleException:
+            #raise
 
         except Exception as err:
             logCrash(self.name,err)
