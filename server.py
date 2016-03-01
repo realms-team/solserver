@@ -21,7 +21,6 @@ from   optparse                 import OptionParser
 from   ConfigParser             import SafeConfigParser
 
 import influxdb
-#import pymongo
 import bottle
 
 import OpenCli
@@ -151,8 +150,6 @@ class Server(threading.Thread):
                                             port='8086',
                                             database='realms'
                                         )
-        #self.mongoClient          = pymongo.MongoClient()
-        #self.mongoCollection      = self.mongoClient['realms']['objects']
         
         # initialize web server
         self.web        = bottle.Bottle()
@@ -274,7 +271,6 @@ class Server(threading.Thread):
             # publish contents
             try:
                 self.influxClient.write_points(dicts)
-                #self.mongoCollection.insert_many(dicts)
             except:
                 AppData().incrStats(STAT_NUM_OBJECTS_DB_FAIL,len(dicts))
                 raise
