@@ -27,6 +27,7 @@ import OpenCli
 import Sol
 import SolVersion
 import server_version
+import flatdict
 
 #============================ defines =========================================
 
@@ -263,10 +264,17 @@ class Server(threading.Thread):
                     status = 400,
                     headers= {'Content-Type': 'application/json'},
                 )
-            
+
+            # only keep DUST_RAW (sol-type = 14)
+            dicts[:] = [obj for obj in dicts if obj['measurement'] == 14]
+
             # parse objects values
             for obj in dicts:
-                obj['value'] = self.sol.parse_value(obj['type'],*obj['value'])
+                obj['fields'] = self.sol.parse_value(obj['measurement'],*obj['fields'])
+
+            # flatten dicts for influxdb
+            for obj in dicts:
+                obj['fields'] = flatdict.FlatDict(obj['fields'])
 
             # publish contents
             try:
