@@ -285,8 +285,8 @@ class Server(threading.Thread):
             else:
                 AppData().incrStats(STAT_NUM_OBJECTS_DB_OK,len(dicts))
 
-        #except bottle.BottleException:
-            #raise
+        except bottle.BottleException:
+            raise
 
         except Exception as err:
             logCrash(self.name,err)
