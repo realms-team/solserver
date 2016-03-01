@@ -258,7 +258,7 @@ class Server(threading.Thread):
             # parse dicts
             try:
                 dicts = self.sol.json_to_dicts(bottle.request.json)
-            except bottle.BottleException:
+            except:
                 raise bottle.HTTPResponse(
                     body   = json.dumps({'error': 'Malformed JSON body contents'}),
                     status = 400,
