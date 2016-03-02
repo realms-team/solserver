@@ -316,7 +316,6 @@ class Server(threading.Thread):
 
             # transform Sol Objects into InfluxDB points
             idicts = o_to_influx(dicts)
-            print idicts
 
             # publish contents
             try:
