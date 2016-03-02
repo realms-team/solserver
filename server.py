@@ -90,8 +90,6 @@ def o_to_influx(dicts):
 
     for obj in dicts:
         iobj = {}
-        iobj['tags'] = {}
-        iobj['fields'] = {}
 
         # (temporary) only keep DUST RAW  and HR
         if (obj['type'] == SolDefines.SOL_TYPE_DUST_NOTIF_DATA_RAW or
@@ -99,17 +97,21 @@ def o_to_influx(dicts):
             obj['type'] == SolDefines.SOL_TYPE_DUST_NOTIF_HR_NEIGHBORS or
             obj['type'] == SolDefines.SOL_TYPE_DUST_NOTIF_HR_DISCOVERED):
 
-            # convert timestamp to UTC
-            iobj['time'] = datetime.datetime.utcfromtimestamp(obj['timestamp'])
+            iobj = {
+                # convert timestamp to UTC
+                "time" : datetime.datetime.utcfromtimestamp(obj['timestamp']),
 
-            # change type name
-            iobj['measurement'] = obj['type']
+                # change type name
+                "measurement" : obj['type'],
 
-            # populate tags
-            iobj['tags']['mac'] = obj['mac']
+                # tags
+                "tags" : {
+                    "mac" : '-'.join(["{0:02x}".format(i) for i in obj['mac']])
+                },
 
-            # populate fields
-            iobj['fields'] = flatdict.FlatDict(obj['value'])
+                # populate fields
+                "fields" : flatdict.FlatDict(obj['value'])
+            }
 
             # append element to list
             idicts.append(iobj)
