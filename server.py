@@ -26,8 +26,10 @@ import bottle
 import OpenCli
 import Sol
 import SolVersion
+import SolDefines
 import server_version
 import flatdict
+import datetime
 
 #============================ defines =========================================
 
@@ -70,6 +72,49 @@ def logCrash(threadName,err):
     print output
     with open(DEFAULT_CRASHLOG,'a') as f:
         f.write(output)
+
+def o_to_influx(dicts):
+    '''
+        Transform list of Sol Objects to list of InfluxDB points
+        Args: dicts (list) list of dictionaries
+        Returns: idicts (list) list of converted dictionaries
+        Exemple:
+            dicts = {
+                "timestamp" : 1455202067
+                "mac" : [ 0, 23, 13, 0, 0, 56, 0, 99 ]
+                "type" 14
+                "value" : [ 240, 185, 240, 185, 0, 0 ]
+            }
+    '''
+    idicts = []
+
+    for obj in dicts:
+        iobj = {}
+        iobj['tags'] = {}
+        iobj['fields'] = {}
+
+        # (temporary) only keep DUST RAW  and HR
+        if (obj['type'] == SolDefines.SOL_TYPE_DUST_NOTIF_DATA_RAW or
+            obj['type'] == SolDefines.SOL_TYPE_DUST_NOTIF_HR_DEVICE or
+            obj['type'] == SolDefines.SOL_TYPE_DUST_NOTIF_HR_NEIGHBORS or
+            obj['type'] == SolDefines.SOL_TYPE_DUST_NOTIF_HR_DISCOVERED):
+
+            # convert timestamp to UTC
+            iobj['time'] = datetime.datetime.utcfromtimestamp(obj['timestamp'])
+
+            # change type name
+            iobj['measurement'] = obj['type']
+
+            # populate tags
+            iobj['tags']['mac'] = obj['mac']
+
+            # populate fields
+            iobj['fields'] = flatdict.FlatDict(obj['value'])
+
+            # append element to list
+            idicts.append(iobj)
+
+    return idicts
 
 #============================ classes =========================================
 
@@ -265,20 +310,17 @@ class Server(threading.Thread):
                     headers= {'Content-Type': 'application/json'},
                 )
 
-            # only keep DUST_RAW (sol-type = 14)
-            dicts[:] = [obj for obj in dicts if obj['measurement'] == 14]
-
             # parse objects values
             for obj in dicts:
-                obj['fields'] = self.sol.parse_value(obj['measurement'],*obj['fields'])
+                obj['value'] = self.sol.parse_value(obj['type'],*obj['value'])
 
-            # flatten dicts for influxdb
-            for obj in dicts:
-                obj['fields'] = flatdict.FlatDict(obj['fields'])
+            # transform Sol Objects into InfluxDB points
+            idicts = o_to_influx(dicts)
+            print idicts
 
             # publish contents
             try:
-                self.influxClient.write_points(dicts)
+                self.influxClient.write_points(idicts)
             except:
                 AppData().incrStats(STAT_NUM_OBJECTS_DB_FAIL,len(dicts))
                 raise
