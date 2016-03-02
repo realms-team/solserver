@@ -20,13 +20,16 @@ import traceback
 from   optparse                 import OptionParser
 from   ConfigParser             import SafeConfigParser
 
-import pymongo
+import influxdb
 import bottle
 
 import OpenCli
 import Sol
 import SolVersion
+import SolDefines
 import server_version
+import flatdict
+import datetime
 
 #============================ defines =========================================
 
@@ -69,6 +72,49 @@ def logCrash(threadName,err):
     print output
     with open(DEFAULT_CRASHLOG,'a') as f:
         f.write(output)
+
+def o_to_influx(dicts):
+    '''
+        Transform list of Sol Objects to list of InfluxDB points
+        Args: dicts (list) list of dictionaries
+        Returns: idicts (list) list of converted dictionaries
+        Exemple:
+            dicts = {
+                "timestamp" : 1455202067
+                "mac" : [ 0, 23, 13, 0, 0, 56, 0, 99 ]
+                "type" 14
+                "value" : [ 240, 185, 240, 185, 0, 0 ]
+            }
+    '''
+    idicts = []
+
+    for obj in dicts:
+        iobj = {}
+        iobj['tags'] = {}
+        iobj['fields'] = {}
+
+        # (temporary) only keep DUST RAW  and HR
+        if (obj['type'] == SolDefines.SOL_TYPE_DUST_NOTIF_DATA_RAW or
+            obj['type'] == SolDefines.SOL_TYPE_DUST_NOTIF_HR_DEVICE or
+            obj['type'] == SolDefines.SOL_TYPE_DUST_NOTIF_HR_NEIGHBORS or
+            obj['type'] == SolDefines.SOL_TYPE_DUST_NOTIF_HR_DISCOVERED):
+
+            # convert timestamp to UTC
+            iobj['time'] = datetime.datetime.utcfromtimestamp(obj['timestamp'])
+
+            # change type name
+            iobj['measurement'] = obj['type']
+
+            # populate tags
+            iobj['tags']['mac'] = obj['mac']
+
+            # populate fields
+            iobj['fields'] = flatdict.FlatDict(obj['value'])
+
+            # append element to list
+            idicts.append(iobj)
+
+    return idicts
 
 #============================ classes =========================================
 
@@ -145,8 +191,11 @@ class Server(threading.Thread):
         self.sol                  = Sol.Sol()
         self.servertoken          = DEFAULT_SERVERTOKEN
         self.basestationtoken     = DEFAULT_BASESTATIONTOKEN
-        self.mongoClient          = pymongo.MongoClient()
-        self.mongoCollection      = self.mongoClient['realms']['objects']
+        self.influxClient         = influxdb.client.InfluxDBClient(
+                                            host='localhost',
+                                            port='8086',
+                                            database='realms'
+                                        )
         
         # initialize web server
         self.web        = bottle.Bottle()
@@ -260,14 +309,18 @@ class Server(threading.Thread):
                     status = 400,
                     headers= {'Content-Type': 'application/json'},
                 )
-            
+
             # parse objects values
             for obj in dicts:
                 obj['value'] = self.sol.parse_value(obj['type'],*obj['value'])
 
+            # transform Sol Objects into InfluxDB points
+            idicts = o_to_influx(dicts)
+            print idicts
+
             # publish contents
             try:
-                self.mongoCollection.insert_many(dicts)
+                self.influxClient.write_points(idicts)
             except:
                 AppData().incrStats(STAT_NUM_OBJECTS_DB_FAIL,len(dicts))
                 raise
