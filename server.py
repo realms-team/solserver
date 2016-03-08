@@ -102,7 +102,7 @@ def o_to_influx(dicts):
                 "time" : datetime.datetime.utcfromtimestamp(obj['timestamp']),
 
                 # change type name
-                "measurement" : obj['type'],
+                "measurement" : SolDefines.solTypeToString(SolDefines,obj['type']),
 
                 # tags
                 "tags" : {
