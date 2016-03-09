@@ -93,6 +93,7 @@ def o_to_influx(dicts):
 
         # (temporary) only keep DUST RAW  and HR
         if (obj['type'] == SolDefines.SOL_TYPE_DUST_NOTIF_DATA_RAW or
+            obj['type'] == SolDefines.SOL_TYPE_DUST_OAP or
             obj['type'] == SolDefines.SOL_TYPE_DUST_NOTIF_HR_DEVICE or
             obj['type'] == SolDefines.SOL_TYPE_DUST_NOTIF_HR_NEIGHBORS or
             obj['type'] == SolDefines.SOL_TYPE_DUST_NOTIF_HR_DISCOVERED):
