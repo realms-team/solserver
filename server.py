@@ -91,12 +91,11 @@ def o_to_influx(dicts):
     for obj in dicts:
         iobj = {}
 
-        # (temporary) only keep DUST RAW  and HR
-        if (obj['type'] == SolDefines.SOL_TYPE_DUST_NOTIF_DATA_RAW or
-            obj['type'] == SolDefines.SOL_TYPE_DUST_OAP or
-            obj['type'] == SolDefines.SOL_TYPE_DUST_NOTIF_HR_DEVICE or
-            obj['type'] == SolDefines.SOL_TYPE_DUST_NOTIF_HR_NEIGHBORS or
-            obj['type'] == SolDefines.SOL_TYPE_DUST_NOTIF_HR_DISCOVERED):
+        # get SOL type name
+        type_name = SolDefines.solTypeToString(SolDefines,obj['type'])
+
+        # (temporary) only keep DUST types
+        if type_name.startswith('SOL_TYPE_DUST') and getattr(SolDefines,type_name)==obj['type']:
 
             iobj = {
                 # convert timestamp to UTC
