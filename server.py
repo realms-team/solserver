@@ -314,7 +314,7 @@ class Server(threading.Thread):
 
             # parse objects values
             for obj in dicts:
-                obj['value'] = self.sol.parse_value(obj['type'],*obj['value'])
+                obj['value'] = self.sol.unpack_obj_value(obj['type'],*obj['value'])
 
             # transform Sol Objects into InfluxDB points
             idicts = o_to_influx(dicts)
