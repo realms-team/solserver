@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-#============================ adjust path =====================================
+# =========================== adjust path =====================================
 
 import sys
 import os
@@ -9,7 +9,7 @@ if __name__ == "__main__":
     here = sys.path[0]
     sys.path.insert(0, os.path.join(here, '..', 'sol'))
 
-#============================ imports =========================================
+# =========================== imports =========================================
 
 import pickle
 import time
@@ -34,7 +34,7 @@ import datetime
 #============================ defines =========================================
 
 DEFAULT_TCPPORT              = 8081
-DEFAULT_SERVERHOST           = '0.0.0.0' # listten on all interfaces
+DEFAULT_SERVERHOST           = '0.0.0.0'  # listten on all interfaces
 
 DEFAULT_CONFIGFILE           = 'server.config'
 DEFAULT_CRASHLOG             = 'server.crashlog'
@@ -267,15 +267,16 @@ class Server(threading.Thread):
             # authorize the client
             self._authorizeClient()
             
-            returnVal = {}
-            returnVal['version server']   = server_version.VERSION
-            returnVal['version Sol']      = SolVersion.VERSION
-            returnVal['uptime computer']  = self._exec_cmd('uptime')
-            returnVal['utc']              = int(time.time())
-            returnVal['date']             = time.strftime("%a, %d %b %Y %H:%M:%S", time.gmtime())
-            returnVal['last reboot']      = self._exec_cmd('last reboot')
-            returnVal['stats']            = AppData().getStats()
-            
+            returnVal = {
+                'version server': server_version.VERSION,
+                'version Sol': SolVersion.VERSION,
+                'uptime computer': self._exec_cmd('uptime'),
+                'utc': int(time.time()),
+                'date': time.strftime("%a, %d %b %Y %H:%M:%S", time.gmtime()),
+                'last reboot': self._exec_cmd('last reboot'),
+                'stats': AppData().getStats()
+            }
+
             bottle.response.content_type = 'application/json'
             return json.dumps(returnVal)
 
@@ -295,7 +296,7 @@ class Server(threading.Thread):
             self._authorizeClient()
             
             # abort if malformed JSON body
-            if bottle.request.json==None:
+            if bottle.request.json is None:
                 raise bottle.HTTPResponse(
                     body   = json.dumps({'error': 'Malformed JSON body'}),
                     status = 400,
