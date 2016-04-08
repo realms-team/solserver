@@ -1,9 +1,7 @@
 #!/usr/bin/python
 
-import sys
 import threading
 import logging
-import binascii
 import time
 from   datetime import timedelta
 

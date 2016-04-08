@@ -135,7 +135,7 @@ class AppData(object):
         try:
             with open(DEFAULT_BACKUPFILE,'r') as f:
                 self.data = pickle.load(f)
-        except:
+        except (EnvironmentError, pickle.PickleError):
             self.data = {
                 'stats' : {},
                 'config' : {
@@ -351,7 +351,7 @@ class Server(threading.Thread):
         returnVal = None
         try:
             returnVal = subprocess.check_output(cmd, shell=False)
-        except:
+        except subprocess.CalledProcessError:
             returnVal = "ERROR"
         return returnVal
     
