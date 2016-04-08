@@ -1,7 +1,7 @@
 *.pyc
-/server.backup
-/server.config
-/server.cert
-/server.ppk
-/basestation.cert
-/server.crashlog
+/solserver.backup
+/solserver.config
+/solserver.cert
+/solserver.ppk
+/solserver.crashlog
+/solmanager.cert
