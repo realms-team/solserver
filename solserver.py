@@ -27,23 +27,23 @@ import OpenCli
 import Sol
 import SolVersion
 import SolDefines
-import server_version
+import solserver_version
 import flatdict
 import datetime
 
 #============================ defines =========================================
 
 DEFAULT_TCPPORT              = 8081
-DEFAULT_SERVERHOST           = '0.0.0.0'  # listten on all interfaces
+DEFAULT_SOLSERVERHOST        = '0.0.0.0'  # listten on all interfaces
 
-DEFAULT_CONFIGFILE           = 'server.config'
-DEFAULT_CRASHLOG             = 'server.crashlog'
-DEFAULT_BACKUPFILE           = 'server.backup'
+DEFAULT_CONFIGFILE           = 'solserver.config'
+DEFAULT_CRASHLOG             = 'solserver.crashlog'
+DEFAULT_BACKUPFILE           = 'solserver.backup'
 # config file
-DEFAULT_SERVERTOKEN          = 'DEFAULT_SERVERTOKEN'
-DEFAULT_BASESTATIONTOKEN     = 'DEFAULT_BASESTATIONTOKEN'
-DEFAULT_SERVERCERT           = 'server.cert'
-DEFAULT_SERVERPRIVKEY        = 'server.ppk'
+DEFAULT_SOLSERVERTOKEN       = 'DEFAULT_SOLSERVERTOKEN'
+DEFAULT_SOLMANAGERTOKEN      = 'DEFAULT_SOLMANAGERTOKEN'
+DEFAULT_SOLSERVERCERT        = 'solserver.cert'
+DEFAULT_SOLSERVERPRIVKEY     = 'solserver.ppk'
 
 # stats
 STAT_NUM_JSON_REQ            = 'NUM_JSON_REQ'
@@ -139,8 +139,8 @@ class AppData(object):
             self.data = {
                 'stats' : {},
                 'config' : {
-                    'servertoken':          DEFAULT_SERVERTOKEN,
-                    'basestationtoken':     DEFAULT_BASESTATIONTOKEN,
+                    'solservertoken':          DEFAULT_SOLSERVERTOKEN,
+                    'solmanagertoken':         DEFAULT_SOLMANAGERTOKEN,
                 },
             }
             self._backupData()
@@ -173,8 +173,8 @@ class CherryPySSL(bottle.ServerAdapter):
         from cherrypy.wsgiserver.ssl_pyopenssl import pyOpenSSLAdapter
         server = wsgiserver.CherryPyWSGIServer((self.host, self.port), handler)
         server.ssl_adapter = pyOpenSSLAdapter(
-            certificate           = DEFAULT_SERVERCERT,
-            private_key           = DEFAULT_SERVERPRIVKEY,
+            certificate           = DEFAULT_SOLSERVERCERT,
+            private_key           = DEFAULT_SOLSERVERPRIVKEY,
         )
         try:
             server.start()
@@ -191,8 +191,8 @@ class Server(threading.Thread):
         # local variables
         AppData()
         self.sol                  = Sol.Sol()
-        self.servertoken          = DEFAULT_SERVERTOKEN
-        self.basestationtoken     = DEFAULT_BASESTATIONTOKEN
+        self.solservertoken       = DEFAULT_SOLSERVERTOKEN
+        self.solmanagertoken      = DEFAULT_SOLSERVERTOKEN
         self.influxClient         = influxdb.client.InfluxDBClient(
                                             host='localhost',
                                             port='8086',
@@ -215,7 +215,7 @@ class Server(threading.Thread):
     def run(self):
         try:
             self.web.run(
-                host   = DEFAULT_SERVERHOST,
+                host   = DEFAULT_SOLSERVERHOST,
                 port   = self.tcpport,
                 server = CherryPySSL,
                 quiet  = True,
@@ -268,7 +268,7 @@ class Server(threading.Thread):
             self._authorizeClient()
             
             returnVal = {
-                'version server': server_version.VERSION,
+                'version solserver': solserver_version.VERSION,
                 'version Sol': SolVersion.VERSION,
                 'uptime computer': self._exec_cmd('uptime'),
                 'utc': int(time.time()),
@@ -339,7 +339,7 @@ class Server(threading.Thread):
     #=== misc
     
     def _authorizeClient(self):
-        if bottle.request.headers.get('X-REALMS-Token')!=self.servertoken:
+        if bottle.request.headers.get('X-REALMS-Token')!=self.solservertoken:
             AppData().incrStats(STAT_NUM_JSON_UNAUTHORIZED)
             raise bottle.HTTPResponse(
                 body   = json.dumps({'error': 'Unauthorized'}),
@@ -357,12 +357,12 @@ class Server(threading.Thread):
     
 #============================ main ============================================
 
-server = None
+solserver = None
 
 def quitCallback():
-    global server
+    global solserver
     
-    server.close()
+    solserver.close()
 
 def cli_cb_stats(params):
     stats = AppData().getStats()
@@ -373,17 +373,17 @@ def cli_cb_stats(params):
     print output
 
 def main(tcpport):
-    global server
+    global solserver
     
     # create the server instance
-    server = Server(
+    solserver = Server(
         tcpport
     )
     
     # start the CLI interface
     cli = OpenCli.OpenCli(
         "Server",
-        server_version.VERSION,
+        solserver_version.VERSION,
         quitCallback,
         [
             ("Sol",SolVersion.VERSION),
@@ -402,25 +402,25 @@ if __name__ == '__main__':
     cf_parser = SafeConfigParser()
     cf_parser.read(DEFAULT_CONFIGFILE) 
 
-    if cf_parser.has_section('basestation'):
-        if cf_parser.has_option('basestation','token'):
-            DEFAULT_BASESTATIONTOKEN = cf_parser.get('basestation','token')
+    if cf_parser.has_section('solmanager'):
+        if cf_parser.has_option('solmanager','token'):
+            DEFAULT_SOLMANAGERTOKEN = cf_parser.get('solmanager','token')
 
-    if cf_parser.has_section('server'):
-        if cf_parser.has_option('server','host'):
-            DEFAULT_SERVER = cf_parser.get('server','host')
-        if cf_parser.has_option('server','tcpport'):
-            DEFAULT_TCPPORT = cf_parser.getint('server','tcpport')
-        if cf_parser.has_option('server','token'):
-            DEFAULT_SERVERTOKEN = cf_parser.get('server','token')
-        if cf_parser.has_option('server','certfile'):
-            DEFAULT_SERVERCERT = cf_parser.get('server','certfile')
-        if cf_parser.has_option('server','privatekey'):
-            DEFAULT_SERVERPRIVKEY = cf_parser.get('server','privatekey')
-        if cf_parser.has_option('server','crashlogfile'):
-            DEFAULT_CRASHLOG = cf_parser.get('server','crashlogfile')
-        if cf_parser.has_option('server','backupfile'):
-            DEFAULT_BACKUPFILE = cf_parser.get('server','backupfile')
+    if cf_parser.has_section('solserver'):
+        if cf_parser.has_option('solserver','host'):
+            DEFAULT_SOLSERVER = cf_parser.get('solserver','host')
+        if cf_parser.has_option('solserver','tcpport'):
+            DEFAULT_TCPPORT = cf_parser.getint('solserver','tcpport')
+        if cf_parser.has_option('solserver','token'):
+            DEFAULT_SOLSERVERTOKEN = cf_parser.get('solserver','token')
+        if cf_parser.has_option('solserver','certfile'):
+            DEFAULT_SOLSERVERCERT = cf_parser.get('solserver','certfile')
+        if cf_parser.has_option('solserver','privatekey'):
+            DEFAULT_SOLSERVERPRIVKEY = cf_parser.get('solserver','privatekey')
+        if cf_parser.has_option('solserver','crashlogfile'):
+            DEFAULT_CRASHLOG = cf_parser.get('solserver','crashlogfile')
+        if cf_parser.has_option('solserver','backupfile'):
+            DEFAULT_BACKUPFILE = cf_parser.get('solserver','backupfile')
 
     # parse the command line
     parser = OptionParser("usage: %prog [options]")
