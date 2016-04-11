@@ -1,6 +1,6 @@
 | Master branch  | Develop branch |
 | -------------- | -------------- |
-| [![Code Health](https://landscape.io/github/realms-team/server-sw/master/landscape.svg?style=flat)](https://landscape.io/github/realms-team/server-sw/master) | [![Code Health](https://landscape.io/github/realms-team/server-sw/develop/landscape.svg?style=flat)](https://landscape.io/github/realms-team/server-sw/develop) |
+| [![Code Health](https://landscape.io/github/realms-team/solserver/master/landscape.svg?style=flat)](https://landscape.io/github/realms-team/solserver/master) | [![Code Health](https://landscape.io/github/realms-team/solserver/develop/landscape.svg?style=flat)](https://landscape.io/github/realms-team/solserver/develop) |
 
 This repo contains the software to run on the solserver. This server:
 * runs a JSON API for managers in the field to report data
