@@ -1,29 +1,28 @@
-[![Code Health](https://landscape.io/github/realms-team/server-sw/master/landscape.svg?style=flat)](https://landscape.io/github/realms-team/server-sw/master)
+| Master branch  | Develop branch |
+| -------------- | -------------- |
+| [![Code Health](https://landscape.io/github/realms-team/server-sw/master/landscape.svg?style=flat)](https://landscape.io/github/realms-team/server-sw/master) | [![Code Health](https://landscape.io/github/realms-team/server-sw/develop/landscape.svg?style=flat)](https://landscape.io/github/realms-team/server-sw/develop) |
 
-This repo contains the software to run on the server. This server:
+This repo contains the software to run on the solserver. This server:
 * runs a JSON API for managers in the field to report data
 * stores that data in a database
 * runs a web interface for users to see sensor/health data
 
 # Installing and Running
 
-* download a release of this repo as well as a release from the https://github.com/realms-team/sol repo side-by-side
-* Generate a private key `server.ppk` and associated (self-signed) certification `server.cert` for SSL protection:
-    * `openssl genrsa -out server.ppk 1024`
-    * `openssl req -new -x509 -key server.ppk -out server.cert -days 1825` (you MUST enter the hostname in the entry "Common Name")
-* place both `server.ppk` and `server.cert` files in the `server-sw` directory
-* copy `server.cert` in the `basestation-fw` directory as well
-* make sure MongoDB is running on your computer
-* double-click/run on `server.py` to start the server
+* download a release of this repo as well as a release from the https://github.com/realms-team/sol repo side by side
+* Generate a private key `solserver.ppk` and associated (self-signed) certification `solserver.cert` for SSL protection:
+    * `openssl genrsa -out solserver.ppk 1024`
+    * `openssl req -new -x509 -key solserver.ppk -out solserver.cert -days 1825` (you MUST enter the hostname in the entry "Common Name")
+* place both `solserver.ppk` and `solserver.cert` files in the `solserver` directory
+* copy `solserver.cert` in the `solmanager` directory as well
+* make sure InfluxDB is running on your computer
+* double-click/run on `solserver.py` to start the server
 
 # JSON API documentation
 
 The server offers a JSON API for managers to report data.
 
 The JSON API is available over HTTP, secured using SSL.
-
-Notes: If you want to access the data manually, you need to forge HTTP messages. You can use a plugin
-such as [PostMan](http://www.getpostman.com).
 
 ## Security
 
@@ -33,7 +32,7 @@ Before taking any action, the server `MUST` verify that this token is authorized
 
 ## Compression
 
-The basestation MAY compress the HTTP body before sending it to the server, resulting in reduced bandwidth utilization. When doing so, the basestation MUST use the `gzip` utility and add the `Content-Encoding: gzip` HTTP header to the request.
+The basestation MAY compress the HTTP body before sending it to the server, resulting in reduce bandwidth utilization. When doing so, the basestation MUST use the `gzip` utility and add the `Content-Encoding: gzip` HTTP header to the request.
 
 ## Base URI
 
@@ -128,22 +127,7 @@ One of the following HTTP status codes is returned:
 
 # Database
 
-The script uses a mongoDB data on which it will insert JSON objects.
-If a database called "realms" does not exists, it will be created.
-
-The data can be obtained either from shell or via the REST API.
-
-## Shell
-* Run the mongo script (Ex: C:\mongodb\bin\mongod.exe or /usr/bin/mongo)
-* Select the database: ``use realms``
-* List all the documents in the *object* collection: ``db.objects.find()``
-
-## REST
-* Enable the REST API when starting the mongodb deamon (use ``--rest``)
-* Query the server: http://\<server_ip\>:\<REST_port\> (Ex: http://localhost:28017/realms/objects/)
-
-Note: To enable the REST API at statup in Linux, add the following line to the mongodb
-configuration: `rest = true`.
+mongoDB, inserting JSON objects to database
 
 # Web Interface
 
