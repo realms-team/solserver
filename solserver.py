@@ -11,41 +11,47 @@ if __name__ == "__main__":
 
 # =========================== imports =========================================
 
+# from default Python
 import pickle
 import time
 import json
 import subprocess
 import threading
 import traceback
+import datetime
 from   optparse                 import OptionParser
 from   ConfigParser             import SafeConfigParser
 
-import influxdb
+# third-party packages
 import bottle
+import influxdb
+import flatdict
 
+# project-specific
 import OpenCli
 import Sol
 import SolVersion
 import SolDefines
 import solserver_version
-import flatdict
-import datetime
 
 #============================ defines =========================================
 
 DEFAULT_TCPPORT              = 8081
-DEFAULT_SOLSERVERHOST        = '0.0.0.0'  # listten on all interfaces
+DEFAULT_SOLSERVERHOST        = '0.0.0.0' # listen on all interfaces
 
 DEFAULT_CONFIGFILE           = 'solserver.config'
 DEFAULT_CRASHLOG             = 'solserver.crashlog'
 DEFAULT_BACKUPFILE           = 'solserver.backup'
+
 # config file
+
 DEFAULT_SOLSERVERTOKEN       = 'DEFAULT_SOLSERVERTOKEN'
 DEFAULT_SOLMANAGERTOKEN      = 'DEFAULT_SOLMANAGERTOKEN'
 DEFAULT_SOLSERVERCERT        = 'solserver.cert'
 DEFAULT_SOLSERVERPRIVKEY     = 'solserver.ppk'
 
 # stats
+
 STAT_NUM_JSON_REQ            = 'NUM_JSON_REQ'
 STAT_NUM_JSON_UNAUTHORIZED   = 'NUM_JSON_UNAUTHORIZED'
 STAT_NUM_CRASHES             = 'NUM_CRASHES'
@@ -72,51 +78,6 @@ def logCrash(threadName,err):
     print output
     with open(DEFAULT_CRASHLOG,'a') as f:
         f.write(output)
-
-def o_to_influx(dicts):
-    '''
-        Transform list of Sol Objects to list of InfluxDB points
-        Args: dicts (list) list of dictionaries
-        Returns: idicts (list) list of converted dictionaries
-        Exemple:
-            dicts = {
-                "timestamp" : 1455202067
-                "mac" : [ 0, 23, 13, 0, 0, 56, 0, 99 ]
-                "type" 14
-                "value" : [ 240, 185, 240, 185, 0, 0 ]
-            }
-    '''
-    idicts = []
-
-    for obj in dicts:
-        iobj = {}
-
-        # get SOL type name
-        type_name = SolDefines.solTypeToString(SolDefines,obj['type'])
-
-        # (temporary) only keep DUST types
-        if type_name.startswith('SOL_TYPE_DUST') and getattr(SolDefines,type_name)==obj['type']:
-
-            iobj = {
-                # convert timestamp to UTC
-                "time" : datetime.datetime.utcfromtimestamp(obj['timestamp']),
-
-                # change type name
-                "measurement" : SolDefines.solTypeToString(SolDefines,obj['type']),
-
-                # tags
-                "tags" : {
-                    "mac" : '-'.join(["{0:02x}".format(i) for i in obj['mac']])
-                },
-
-                # populate fields
-                "fields" : flatdict.FlatDict(obj['value'])
-            }
-
-            # append element to list
-            idicts.append(iobj)
-
-    return idicts
 
 #============================ classes =========================================
 
@@ -194,14 +155,14 @@ class Server(threading.Thread):
         self.solservertoken       = DEFAULT_SOLSERVERTOKEN
         self.solmanagertoken      = DEFAULT_SOLSERVERTOKEN
         self.influxClient         = influxdb.client.InfluxDBClient(
-                                            host='localhost',
-                                            port='8086',
-                                            database='realms'
-                                        )
+            host        = 'localhost',
+            port        = '8086',
+            database    = 'realms'
+        )
         
         # initialize web server
         self.web        = bottle.Bottle()
-        #self.web.route(path='/',                   method='GET', callback=self._cb_root_GET)
+        self.web.route(path='/',                   method='GET', callback=self._cb_root_GET)
         self.web.route(path='/api/v1/echo.json',   method='POST',callback=self._cb_echo_POST)
         self.web.route(path='/api/v1/status.json', method='GET', callback=self._cb_status_GET)
         self.web.route(path='/api/v1/o.json',      method='PUT', callback=self._cb_o_PUT)
@@ -303,9 +264,9 @@ class Server(threading.Thread):
                     headers= {'Content-Type': 'application/json'},
                 )
 
-            # parse dicts
+            # http->bin
             try:
-                dicts = self.sol.contenttype_to_bin(bottle.request.json)
+                sol_binl = self.sol.http_to_bin(bottle.request.json)
             except:
                 raise bottle.HTTPResponse(
                     body   = json.dumps({'error': 'Malformed JSON body contents'}),
@@ -313,21 +274,22 @@ class Server(threading.Thread):
                     headers= {'Content-Type': 'application/json'},
                 )
 
-            # parse objects values
-            for obj in dicts:
-                obj['value'] = self.sol.unpack_obj_value(obj['type'],*obj['value'])
-
-            # transform Sol Objects into InfluxDB points
-            idicts = o_to_influx(dicts)
-
-            # publish contents
+            # bin->json->influxdb format, then write to put database
+            sol_influxdbl = []
+            for sol_bin in sol_binl:
+                
+                # convert bin->json->influxdb
+                sol_json          = self.sol.bin_to_json(sol_bin)
+                sol_influxdbl    += [self.sol.json_to_influxdb(sol_json)]
+                
+            # write to database
             try:
-                self.influxClient.write_points(idicts)
+                self.influxClient.write_points(sol_influxdbl)
             except:
-                AppData().incrStats(STAT_NUM_OBJECTS_DB_FAIL,len(dicts))
+                AppData().incrStats(STAT_NUM_OBJECTS_DB_FAIL,1)
                 raise
             else:
-                AppData().incrStats(STAT_NUM_OBJECTS_DB_OK,len(dicts))
+                AppData().incrStats(STAT_NUM_OBJECTS_DB_OK,)
 
         except bottle.BottleException:
             raise
