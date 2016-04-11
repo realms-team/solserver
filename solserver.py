@@ -1,43 +1,57 @@
 #!/usr/bin/python
 
-#============================ adjust path =====================================
+# =========================== adjust path =====================================
 
 import sys
 import os
 
 if __name__ == "__main__":
     here = sys.path[0]
-    sys.path.insert(0, os.path.join(here, '..', 'Sol'))
+    sys.path.insert(0, os.path.join(here, '..', 'sol'))
 
-#============================ imports =========================================
+# =========================== imports =========================================
 
+# from default Python
 import pickle
 import time
 import json
 import subprocess
 import threading
 import traceback
-from   optparse import OptionParser
+import datetime
+from   optparse                 import OptionParser
+from   ConfigParser             import SafeConfigParser
 
-import pymongo
+# third-party packages
 import bottle
+import influxdb
+import flatdict
 
+# project-specific
 import OpenCli
 import Sol
 import SolVersion
-import server_version
+import SolDefines
+import solserver_version
 
 #============================ defines =========================================
 
 DEFAULT_TCPPORT              = 8081
+DEFAULT_SOLSERVERHOST        = '0.0.0.0' # listen on all interfaces
 
-DEFAULT_CRASHLOG             = 'server.crashlog'
-DEFAULT_BACKUPFILE           = 'server.backup'
+DEFAULT_CONFIGFILE           = 'solserver.config'
+DEFAULT_CRASHLOG             = 'solserver.crashlog'
+DEFAULT_BACKUPFILE           = 'solserver.backup'
+
 # config file
-DEFAULT_SERVERTOKEN          = 'DEFAULT_SERVERTOKEN'
-DEFAULT_BASESTATIONTOKEN     = 'DEFAULT_BASESTATIONTOKEN'
+
+DEFAULT_SOLSERVERTOKEN       = 'DEFAULT_SOLSERVERTOKEN'
+DEFAULT_SOLMANAGERTOKEN      = 'DEFAULT_SOLMANAGERTOKEN'
+DEFAULT_SOLSERVERCERT        = 'solserver.cert'
+DEFAULT_SOLSERVERPRIVKEY     = 'solserver.ppk'
 
 # stats
+
 STAT_NUM_JSON_REQ            = 'NUM_JSON_REQ'
 STAT_NUM_JSON_UNAUTHORIZED   = 'NUM_JSON_UNAUTHORIZED'
 STAT_NUM_CRASHES             = 'NUM_CRASHES'
@@ -82,12 +96,12 @@ class AppData(object):
         try:
             with open(DEFAULT_BACKUPFILE,'r') as f:
                 self.data = pickle.load(f)
-        except:
+        except (EnvironmentError, pickle.PickleError):
             self.data = {
                 'stats' : {},
                 'config' : {
-                    'servertoken':          DEFAULT_SERVERTOKEN,
-                    'basestationtoken':     DEFAULT_BASESTATIONTOKEN,
+                    'solservertoken':          DEFAULT_SOLSERVERTOKEN,
+                    'solmanagertoken':         DEFAULT_SOLMANAGERTOKEN,
                 },
             }
             self._backupData()
@@ -120,8 +134,8 @@ class CherryPySSL(bottle.ServerAdapter):
         from cherrypy.wsgiserver.ssl_pyopenssl import pyOpenSSLAdapter
         server = wsgiserver.CherryPyWSGIServer((self.host, self.port), handler)
         server.ssl_adapter = pyOpenSSLAdapter(
-            certificate           = "server.cert",
-            private_key           = "server.ppk",
+            certificate           = DEFAULT_SOLSERVERCERT,
+            private_key           = DEFAULT_SOLSERVERPRIVKEY,
         )
         try:
             server.start()
@@ -138,14 +152,17 @@ class Server(threading.Thread):
         # local variables
         AppData()
         self.sol                  = Sol.Sol()
-        self.servertoken          = DEFAULT_SERVERTOKEN # TODO: read from file
-        self.basestationtoken     = DEFAULT_BASESTATIONTOKEN # TODO: read from file
-        self.mongoClient          = pymongo.MongoClient()
-        self.mongoCollection      = self.mongoClient['realms']['objects']
+        self.solservertoken       = DEFAULT_SOLSERVERTOKEN
+        self.solmanagertoken      = DEFAULT_SOLSERVERTOKEN
+        self.influxClient         = influxdb.client.InfluxDBClient(
+            host        = 'localhost',
+            port        = '8086',
+            database    = 'realms'
+        )
         
         # initialize web server
         self.web        = bottle.Bottle()
-        #self.web.route(path='/',                   method='GET', callback=self._cb_root_GET)
+        self.web.route(path='/',                   method='GET', callback=self._cb_root_GET)
         self.web.route(path='/api/v1/echo.json',   method='POST',callback=self._cb_echo_POST)
         self.web.route(path='/api/v1/status.json', method='GET', callback=self._cb_status_GET)
         self.web.route(path='/api/v1/o.json',      method='PUT', callback=self._cb_o_PUT)
@@ -159,12 +176,16 @@ class Server(threading.Thread):
     def run(self):
         try:
             self.web.run(
-                host   = 'localhost',
+                host   = DEFAULT_SOLSERVERHOST,
                 port   = self.tcpport,
                 server = CherryPySSL,
                 quiet  = True,
                 debug  = False,
             )
+        
+        except bottle.BottleException:
+            raise
+
         except Exception as err:
             logCrash(self.name,err)
     
@@ -191,6 +212,9 @@ class Server(threading.Thread):
             
             bottle.response.content_type = bottle.request.content_type
             return bottle.request.body.read()
+        
+        except bottle.BottleException:
+            raise
            
         except Exception as err:
             logCrash(self.name,err)
@@ -204,18 +228,22 @@ class Server(threading.Thread):
             # authorize the client
             self._authorizeClient()
             
-            returnVal = {}
-            returnVal['version server']   = server_version.VERSION
-            returnVal['version Sol']      = SolVersion.VERSION
-            returnVal['uptime computer']  = self._exec_cmd('uptime')
-            returnVal['utc']              = int(time.time())
-            returnVal['date']             = time.strftime("%a, %d %b %Y %H:%M:%S", time.gmtime())
-            returnVal['last reboot']      = self._exec_cmd('last reboot')
-            returnVal['stats']            = AppData().getStats()
-            
+            returnVal = {
+                'version solserver': solserver_version.VERSION,
+                'version Sol': SolVersion.VERSION,
+                'uptime computer': self._exec_cmd('uptime'),
+                'utc': int(time.time()),
+                'date': time.strftime("%a, %d %b %Y %H:%M:%S", time.gmtime()),
+                'last reboot': self._exec_cmd('last reboot'),
+                'stats': AppData().getStats()
+            }
+
             bottle.response.content_type = 'application/json'
             return json.dumps(returnVal)
-            
+
+        except bottle.BottleException:
+            raise
+
         except Exception as err:
             logCrash(self.name,err)
             raise
@@ -229,32 +257,43 @@ class Server(threading.Thread):
             self._authorizeClient()
             
             # abort if malformed JSON body
-            if bottle.request.json==None:
+            if bottle.request.json is None:
                 raise bottle.HTTPResponse(
                     body   = json.dumps({'error': 'Malformed JSON body'}),
                     status = 400,
                     headers= {'Content-Type': 'application/json'},
                 )
-            
-            # parse dicts
+
+            # http->bin
             try:
-                dicts = self.sol.json_to_dicts(bottle.request.json)
+                sol_binl = self.sol.http_to_bin(bottle.request.json)
             except:
                 raise bottle.HTTPResponse(
                     body   = json.dumps({'error': 'Malformed JSON body contents'}),
                     status = 400,
                     headers= {'Content-Type': 'application/json'},
                 )
-            
-            # publish contents
+
+            # bin->json->influxdb format, then write to put database
+            sol_influxdbl = []
+            for sol_bin in sol_binl:
+                
+                # convert bin->json->influxdb
+                sol_json          = self.sol.bin_to_json(sol_bin)
+                sol_influxdbl    += [self.sol.json_to_influxdb(sol_json)]
+                
+            # write to database
             try:
-                self.mongoCollection.insert_many(dicts)
+                self.influxClient.write_points(sol_influxdbl)
             except:
-                AppData().incrStats(STAT_NUM_OBJECTS_DB_FAIL,len(dicts))
+                AppData().incrStats(STAT_NUM_OBJECTS_DB_FAIL,1)
                 raise
             else:
-                AppData().incrStats(STAT_NUM_OBJECTS_DB_OK,len(dicts))
-            
+                AppData().incrStats(STAT_NUM_OBJECTS_DB_OK,)
+
+        except bottle.BottleException:
+            raise
+
         except Exception as err:
             logCrash(self.name,err)
             raise
@@ -262,7 +301,7 @@ class Server(threading.Thread):
     #=== misc
     
     def _authorizeClient(self):
-        if bottle.request.headers.get('X-REALMS-Token')!=self.servertoken:
+        if bottle.request.headers.get('X-REALMS-Token')!=self.solservertoken:
             AppData().incrStats(STAT_NUM_JSON_UNAUTHORIZED)
             raise bottle.HTTPResponse(
                 body   = json.dumps({'error': 'Unauthorized'}),
@@ -274,18 +313,18 @@ class Server(threading.Thread):
         returnVal = None
         try:
             returnVal = subprocess.check_output(cmd, shell=False)
-        except:
+        except subprocess.CalledProcessError:
             returnVal = "ERROR"
         return returnVal
     
 #============================ main ============================================
 
-server = None
+solserver = None
 
 def quitCallback():
-    global server
+    global solserver
     
-    server.close()
+    solserver.close()
 
 def cli_cb_stats(params):
     stats = AppData().getStats()
@@ -296,17 +335,17 @@ def cli_cb_stats(params):
     print output
 
 def main(tcpport):
-    global server
+    global solserver
     
     # create the server instance
-    server = Server(
+    solserver = Server(
         tcpport
     )
     
     # start the CLI interface
     cli = OpenCli.OpenCli(
         "Server",
-        server_version.VERSION,
+        solserver_version.VERSION,
         quitCallback,
         [
             ("Sol",SolVersion.VERSION),
@@ -321,7 +360,30 @@ def main(tcpport):
     )
 
 if __name__ == '__main__':
-    
+    # parse the config file
+    cf_parser = SafeConfigParser()
+    cf_parser.read(DEFAULT_CONFIGFILE) 
+
+    if cf_parser.has_section('solmanager'):
+        if cf_parser.has_option('solmanager','token'):
+            DEFAULT_SOLMANAGERTOKEN = cf_parser.get('solmanager','token')
+
+    if cf_parser.has_section('solserver'):
+        if cf_parser.has_option('solserver','host'):
+            DEFAULT_SOLSERVER = cf_parser.get('solserver','host')
+        if cf_parser.has_option('solserver','tcpport'):
+            DEFAULT_TCPPORT = cf_parser.getint('solserver','tcpport')
+        if cf_parser.has_option('solserver','token'):
+            DEFAULT_SOLSERVERTOKEN = cf_parser.get('solserver','token')
+        if cf_parser.has_option('solserver','certfile'):
+            DEFAULT_SOLSERVERCERT = cf_parser.get('solserver','certfile')
+        if cf_parser.has_option('solserver','privatekey'):
+            DEFAULT_SOLSERVERPRIVKEY = cf_parser.get('solserver','privatekey')
+        if cf_parser.has_option('solserver','crashlogfile'):
+            DEFAULT_CRASHLOG = cf_parser.get('solserver','crashlogfile')
+        if cf_parser.has_option('solserver','backupfile'):
+            DEFAULT_BACKUPFILE = cf_parser.get('solserver','backupfile')
+
     # parse the command line
     parser = OptionParser("usage: %prog [options]")
     parser.add_option(

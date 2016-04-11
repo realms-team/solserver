@@ -1,0 +1,4 @@
+max-line-length: 79
+
+ignore-paths:
+  - smartmeshsdk-master
