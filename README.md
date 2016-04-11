@@ -1,4 +1,4 @@
-This repo contains the software to run on the server. This server:
+This repo contains the software to run on the solserver. This server:
 * runs a JSON API for managers in the field to report data
 * stores that data in a database
 * runs a web interface for users to see sensor/health data
@@ -6,13 +6,13 @@ This repo contains the software to run on the server. This server:
 # Installing and Running
 
 * download a release of this repo as well as a release from the https://github.com/realms-team/sol repo side by side
-* Generate a private key `server.ppk` and associated (self-signed) certification `server.cert` for SSL protection:
-    * `openssl genrsa -out server.ppk 1024`
-    * `openssl req -new -x509 -key server.ppk -out server.cert -days 1825` (you MUST enter the hostname in the entry "Common Name")
-* place both `server.ppk` and `server.cert` files in the `server-sw` directory
-* copy `server.cert` in the `basestation-fw` directory as well
+* Generate a private key `solserver.ppk` and associated (self-signed) certification `solserver.cert` for SSL protection:
+    * `openssl genrsa -out solserver.ppk 1024`
+    * `openssl req -new -x509 -key solserver.ppk -out solserver.cert -days 1825` (you MUST enter the hostname in the entry "Common Name")
+* place both `solserver.ppk` and `solserver.cert` files in the `solserver` directory
+* copy `solserver.cert` in the `solmanager` directory as well
 * make sure InfluxDB is running on your computer
-* double-click/run on `server.py` to start the server
+* double-click/run on `solserver.py` to start the server
 
 # JSON API documentation
 
