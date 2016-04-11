@@ -1,18 +1,17 @@
 [solmanager]
-# Security
-token = DEFAULT_SOLMANAGERTOKEN
-
+# security
+token         = DEFAULT_SOLMANAGERTOKEN
 
 [solserver]
-# Connection
-tcpport = 8081
-host = 0.0.0.0 #listen on all interfaces 
+# connection
+tcpport       = 8081
+host          = 0.0.0.0 #listen on all interfaces 
 
-# Security
-token = DEFAULT_SOLSERVERTOKEN
-certfile = solserver.cert
-privatekey = solserver.ppk
+# security
+token         = DEFAULT_SOLSERVERTOKEN
+certfile      = solserver.cert
+privatekey    = solserver.ppk
 
-# Files
-crashlogfile = solserver.crashlog
-backupfile = solserver.backup
+# files
+crashlogfile  = solserver.crashlog
+backupfile    = solserver.backup
