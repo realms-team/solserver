@@ -10,15 +10,16 @@ function initMap() {
 }
 
 function load_data(){
-    query       = "SELECT * FROM SOL_TYPE_DUST_NOTIF_HRNEIGHBORS WHERE \"site\"='ARG_junin' LIMIT 2";
+    query       = "SELECT * FROM SOL_TYPE_DUST_NOTIF_HRNEIGHBORS WHERE \"site\"=\'ARG_junin\' LIMIT 10";
     enc_query   = encodeURIComponent(query);
     $.getJSON("jsonp/" + enc_query, create_paths);
     //setTimeout(load_data(), 1000000);
 }
 
 function create_paths(data){
-    console.log(data)
     for (var i=0; i < data.length; i++) {
+
+        // Markers
         var myLatLng = new google.maps.LatLng(
                                 data[i].value.latitude,
                                 data[i].value.longitude);
@@ -29,8 +30,10 @@ function create_paths(data){
             });
             markers.push(marker);
         }
-        for (var j=0; j<data.neighbors.length; j++){
-           alert(data.neighbors[j])
+
+        // Paths
+        for (var j=0; j<data[i].value.neighbors.length; j++){
+           console.log(data[i].value.neighbors[j].rssi)
         }
     }
 }

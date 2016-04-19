@@ -205,7 +205,7 @@ class Server(threading.Thread):
         return bottle.static_file(filename, "www")
 
     def _cb_jsonp_GET(self, query):
-        influx_json = requests.get("http://sol.paris.inria.fr:8086/query?db=realms&q="+query)
+        influx_json = requests.get("http://localhost:8086/query?db=realms&q="+query)
         j = self.sol.influxdb_to_json(influx_json.json()['results'][0])
         return json.dumps(j)
 
