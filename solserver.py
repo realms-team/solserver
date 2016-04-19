@@ -26,6 +26,7 @@ from   ConfigParser             import SafeConfigParser
 import bottle
 import influxdb
 import flatdict
+import requests
 
 # project-specific
 import OpenCli
@@ -162,7 +163,8 @@ class Server(threading.Thread):
         
         # initialize web server
         self.web        = bottle.Bottle()
-        self.web.route(path='/',                   method='GET', callback=self._cb_root_GET)
+        self.web.route(path=['/<filename>',"/"],   method='GET', callback=self._cb_root_GET, name='static')
+        self.web.route(path=['/jsonp/<query>'],    method='GET', callback=self._cb_jsonp_GET)
         self.web.route(path='/api/v1/echo.json',   method='POST',callback=self._cb_echo_POST)
         self.web.route(path='/api/v1/status.json', method='GET', callback=self._cb_status_GET)
         self.web.route(path='/api/v1/o.json',      method='PUT', callback=self._cb_o_PUT)
@@ -199,9 +201,14 @@ class Server(threading.Thread):
     
     #=== JSON request handler
     
-    def _cb_root_GET(self):
-        return 'It works!'
-    
+    def _cb_root_GET(self, filename="map.html"):
+        return bottle.static_file(filename, "www")
+
+    def _cb_jsonp_GET(self, query):
+        influx_json = requests.get("http://sol.paris.inria.fr:8086/query?db=realms&q="+query)
+        j = self.sol.influxdb_to_json(influx_json.json()['results'][0])
+        return json.dumps(j)
+
     def _cb_echo_POST(self):
         try:
             # update stats
