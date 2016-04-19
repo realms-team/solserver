@@ -10,7 +10,7 @@ function initMap() {
 }
 
 function load_data(){
-    query       = "SELECT * FROM SOL_TYPE_DUST_OAP_TEMPSAMPLE LIMIT 1";
+    query       = "SELECT * FROM SOL_TYPE_DUST_NOTIF_HRNEIGHBORS WHERE \"site\"='ARG_junin' LIMIT 2";
     enc_query   = encodeURIComponent(query);
     $.getJSON("jsonp/" + enc_query, create_paths);
     //setTimeout(load_data(), 1000000);
@@ -28,6 +28,9 @@ function create_paths(data){
                 map: map,
             });
             markers.push(marker);
+        }
+        for (var j=0; j<data.neighbors.length; j++){
+           alert(data.neighbors[j])
         }
     }
 }
