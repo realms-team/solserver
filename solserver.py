@@ -206,7 +206,10 @@ class Server(threading.Thread):
 
     def _cb_jsonp_GET(self, sol_type):
         query = "SELECT * FROM " + sol_type
-        query = query + " WHERE time > now() - 1d"
+        if ( sol_type == "SOL_TYPE_DUST_EVENTMOTECREATE"):
+            query = query + " WHERE time > now() - 2d LIMIT 23"
+        else :
+            query = query + " WHERE time > now() - 2d LIMIT 10"
         influx_json = requests.get("http://localhost:8086/query?db=realms&q="+query)
         j = self.sol.influxdb_to_json(influx_json.json())
         return json.dumps(j)
