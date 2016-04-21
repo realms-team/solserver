@@ -4,5 +4,18 @@ html, body {
   padding: 0;
 }
 #map {
+  display: inline-block;
   height: 100%;
+  width: 80%;
+  padding: 0;
+  margin: 0;
+}
+#control_panel{
+    display: inline-block;
+    height: 100%;
+    width:19%;
+    min-width: 200px;
+    padding: 0;
+    margin: 0;
+    vertical-align: top;
 }

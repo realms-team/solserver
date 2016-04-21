@@ -164,7 +164,7 @@ class Server(threading.Thread):
         # initialize web server
         self.web        = bottle.Bottle()
         self.web.route(path=['/<filename>',"/"],   method='GET', callback=self._cb_root_GET, name='static')
-        self.web.route(path=['/jsonp/<sol_type>'], method='GET', callback=self._cb_jsonp_GET)
+        self.web.route(path=['/jsonp/<sol_type>/time/<utc_time>'], method='GET', callback=self._cb_jsonp_GET)
         self.web.route(path='/api/v1/echo.json',   method='POST',callback=self._cb_echo_POST)
         self.web.route(path='/api/v1/status.json', method='GET', callback=self._cb_status_GET)
         self.web.route(path='/api/v1/o.json',      method='PUT', callback=self._cb_o_PUT)
@@ -204,12 +204,18 @@ class Server(threading.Thread):
     def _cb_root_GET(self, filename="map.html"):
         return bottle.static_file(filename, "www")
 
-    def _cb_jsonp_GET(self, sol_type):
+    def _cb_jsonp_GET(self, sol_type, utc_time):
+        # compute time + 30m
+        end_time = datetime.datetime.strptime(utc_time, '%Y-%m-%dT%H:%M:%S.%fZ') + \
+                        datetime.timedelta(minutes=31)
+        end_time = end_time.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+
+        # build InfluxDB query
         query = "SELECT * FROM " + sol_type
-        if ( sol_type == "SOL_TYPE_DUST_EVENTMOTECREATE"):
-            query = query + " WHERE time > now() - 2d LIMIT 23"
-        else :
-            query = query + " WHERE time > now() - 2d LIMIT 10"
+        if (sol_type == "SOL_TYPE_DUST_NOTIF_HRNEIGHBORS"):
+            query = query + " WHERE time > '" + utc_time + "' AND time < '" + end_time + "'"
+
+        # send query, parse the result and return the output in json
         influx_json = requests.get("http://localhost:8086/query?db=realms&q="+query)
         j = self.sol.influxdb_to_json(influx_json.json())
         return json.dumps(j)

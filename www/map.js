@@ -8,10 +8,11 @@ var GOOD_LINK_COLOR     = "#00ff00"     // green
 var MEDIUM_LINK_COLOR   = "#ffff00"     // orange
 var BAD_LINK_COLOR      = "#ffff00"     // red
 
+// Global variables
 var map;
-var markers = [];
 var MOTES = [];         // a list of [mac, Marker]
 var LINKS = [];         // a list of [Polyline, rssi]
+var timeout;
 
 //------------------ Init functions ------------------------------------------//
 
@@ -21,22 +22,32 @@ function initMap() {
         zoom: 20
     });
     map.setMapTypeId(google.maps.MapTypeId.SATELLITE);
+
+    $('#timepicker').timepicker();
+    $( "#datepicker" ).datepicker();
 }
 
-function load_data(){
+function load_data(utcTime, loop){
     clearLinks();
 
+    if (utcTime == null)
+        utcTime = new Date().toISOString();
+
     // MOTE CREATE
-    query = "SOL_TYPE_DUST_EVENTMOTECREATE";
-    enc_query   = encodeURIComponent(query);
-    $.getJSON("jsonp/" + enc_query, create_mote);
+    var solType     = "SOL_TYPE_DUST_EVENTMOTECREATE";
+    var encType     = encodeURIComponent(solType);
+    var encTime     = encodeURIComponent(utcTime);
+    $.getJSON("jsonp/" + encType + "/time/" + encTime, create_mote);
 
     // LINKS CREATE
-    query = "SOL_TYPE_DUST_NOTIF_HRNEIGHBORS";
-    enc_query   = encodeURIComponent(query);
-    $.getJSON("jsonp/" + enc_query, create_links);
+    solType         = "SOL_TYPE_DUST_NOTIF_HRNEIGHBORS";
+    encType         = encodeURIComponent(solType);
+    $.getJSON("jsonp/" + encType + "/time/" + encTime, create_links);
 
-    setTimeout(load_data, 30000);
+    if (loop != 0)
+        timeout = setTimeout(load_data, 30000);
+    else
+        clearTimeout(timeout)
 }
 
 //------------------ Main functions ------------------------------------------//
@@ -91,6 +102,14 @@ function create_links(data){
     }
 }
 
+function setDate(){
+    var date = $("#datepicker").val();
+    var time = $("#timepicker").val();
+    var utcTime = new Date(date + " " + time).toISOString();
+    noLoop = 0;
+    load_data(utcTime, noLoop);
+}
+
 //------------------ Helpers ------------------------------------------------//
 
 function clearLinks(){
@@ -105,7 +124,6 @@ function clearLinks(){
 }
 
 function getLinkColor(rssi){
-    console.log(rssi)
     if (rssi>GOOD_LINK_LIMIT)
         return GOOD_LINK_COLOR;
     else if ( rssi >= MEDIUM_LINK_LIMIT && rssi <= GOOD_LINK_LIMIT)
@@ -141,8 +159,8 @@ function getLink(LatLng1, LatLng2){
 }
 
 function markerExists(LatLng){
-    for (i=0; i<markers.length; i++ ) {
-        if (markers[i].getPosition().toString() == LatLng.toString())
+    for (i in MOTES) {
+        if (MOTES[i][0].getPosition().toString() == LatLng.toString())
           return 1;
     }
     return 0;
