@@ -54,48 +54,42 @@ function load_data(utcTime, loop){
 
 function create_mote(data){
     for (var i=0; i < data.length; i++) {
-        // create Markers
-        var myLatLng = new google.maps.LatLng(
-                                data[i].value.latitude,
-                                data[i].value.longitude);
-        var marker = new google.maps.Marker({
-            position: myLatLng,
-            map: map,
-        });
-        // add popup listener
-        infoBox(map, marker, data[i]);
-
         // populate table
-        MOTES[data[i].value.moteId] = [data[i].mac, marker]
+        MOTES[data[i].value.moteId] = [data[i].value.macAddress, null]
     }
 }
 
 function create_links(data){
+    for (var i=0; i < data.length; i++) {
+        udpateMote(data[i].mac, data[i].value.latitude,data[i].value.longitude);
+    }
     for (var i=0; i < data.length; i++) {
         for (var j=0; j<data[i].value.neighbors.length; j++){
             var neighbor = data[i].value.neighbors[j];
             if (neighbor.neighborId in MOTES){
                 var crd1 = getLocationFromMac(data[i].mac);
                 var crd2 = getLocationFromId(neighbor.neighborId)
-                var lineCoordinates = [
-                    crd1,
-                    crd2
-                ];
-                var link = getLink(crd1, crd2);
+                if (crd1 != null && crd2 != null){
+                    var lineCoordinates = [
+                        crd1,
+                        crd2
+                    ];
+                    var link = getLink(crd1, crd2);
 
-                // update link if already exists and new rssi is worst
-                if (link != null){
-                    if (neighbor.rssi < link[1]){
+                    // update link if already exists and new rssi is worst
+                    if (link != null){
+                        if (neighbor.rssi < link[1]){
+                            var color = getLinkColor(neighbor.rssi);
+                            link[1] = neighbor.rssi;
+                            link[0].setMap(null);
+                            link[0] = createPolyline(lineCoordinates,color);
+                        }
+                    } // create link if it does not already exists
+                    else {
                         var color = getLinkColor(neighbor.rssi);
-                        link[1] = neighbor.rssi;
-                        link[0].setMap(null);
-                        link[0] = createPolyline(lineCoordinates,color);
+                        var l = createPolyline(lineCoordinates,color);
+                        LINKS.push([l, neighbor.rssi]);
                     }
-                } // create link if it does not already exists
-                else {
-                    var color = getLinkColor(neighbor.rssi);
-                    var l = createPolyline(lineCoordinates,color);
-                    LINKS.push([l, neighbor.rssi]);
                 }
             }
         }
@@ -114,7 +108,7 @@ function setDate(){
 
 function clearLinks(){
     // remove links
-    for (i=0; i<LINKS.length; i++) {
+    for (var i=0; i<LINKS.length; i++) {
         if (i in LINKS){
             LINKS[i][0].setMap(null);
         }
@@ -130,6 +124,33 @@ function getLinkColor(rssi){
         return MEDIUM_LINK_COLOR;
     else
         return BAD_LINK_COLOR;
+}
+
+function udpateMote(mac, lat, lng){
+    var moteId = null;
+    for (var i=0; i<MOTES.length; i++) {
+        if (i in MOTES){
+            if (MOTES[i][0] == mac){
+                if (MOTES[i][1] == null){
+                    MOTES[i][1] = createMarker(lat, lng, mac);
+                } else {
+                    // TODO UPDATE MARKER
+                }
+            }
+        }
+    }
+}
+
+function createMarker(lat, lng, content){
+    // create Markers
+    var myLatLng = new google.maps.LatLng(lat, lng)
+    var marker = new google.maps.Marker({
+        position: myLatLng,
+        map: map,
+    });
+    // add popup listener
+    infoBox(map, marker, content);
+    return marker;
 }
 
 function createPolyline(lineCoordinates,color){
@@ -167,7 +188,10 @@ function markerExists(LatLng){
 }
 
 function getLocationFromId(moteId){
-    return MOTES[moteId][1].position;
+    if (MOTES[moteId][1] != null)
+        return MOTES[moteId][1].position;
+    else
+        return null
 }
 
 function getLocationFromMac(mac){
@@ -182,11 +206,11 @@ function getLocationFromMac(mac){
 /*Function that shows a window with the content or info
  about the marker (sensor location)*/
 
-function infoBox(map, marker, data) {
+function infoBox(map, marker, content) {
     var infoWindow = new google.maps.InfoWindow();
     // Attaching a click event to the current marker
     google.maps.event.addListener(marker, "click", function(e) {
-        infoWindow.setContent(data.mac);
+        infoWindow.setContent(content);
         infoWindow.open(map, marker);
     });
 }

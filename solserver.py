@@ -213,11 +213,12 @@ class Server(threading.Thread):
         # build InfluxDB query
         query = "SELECT * FROM " + sol_type
         if (sol_type == "SOL_TYPE_DUST_NOTIF_HRNEIGHBORS"):
-            query = query + " WHERE time > '" + utc_time + "' AND time < '" + end_time + "'"
+            query = query + " WHERE time > '" + utc_time + "' LIMIT 30"
 
         # send query, parse the result and return the output in json
         influx_json = requests.get("http://localhost:8086/query?db=realms&q="+query)
         j = self.sol.influxdb_to_json(influx_json.json())
+        print j
         return json.dumps(j)
 
     def _cb_echo_POST(self):
