@@ -18,8 +18,8 @@ var timeout;
 
 function initMap() {
     map = new google.maps.Map(document.getElementById('map'), {
-        center: {lat: -33.114274, lng: -68.480041},
-        zoom: 20
+        center: {lat: -33.114974, lng: -68.481041},
+        zoom: 18
     });
     map.setMapTypeId(google.maps.MapTypeId.SATELLITE);
 
@@ -37,12 +37,12 @@ function load_data(utcTime, loop){
     var solType     = "SOL_TYPE_DUST_EVENTMOTECREATE";
     var encType     = encodeURIComponent(solType);
     var encTime     = encodeURIComponent(utcTime);
-    $.getJSON("jsonp/" + encType + "/time/" + encTime, create_mote);
+    $.getJSON("jsonp/ARG_junin/" + encType + "/time/" + encTime, create_mote);
 
     // LINKS CREATE
     solType         = "SOL_TYPE_DUST_NOTIF_HRNEIGHBORS";
     encType         = encodeURIComponent(solType);
-    $.getJSON("jsonp/" + encType + "/time/" + encTime, create_links);
+    $.getJSON("jsonp/ARG_junin/" + encType + "/time/" + encTime, create_links);
 
     if (loop != 0)
         timeout = setTimeout(load_data, 30000);
@@ -79,15 +79,13 @@ function create_links(data){
                     // update link if already exists and new rssi is worst
                     if (link != null){
                         if (neighbor.rssi < link[1]){
-                            var color = getLinkColor(neighbor.rssi);
                             link[1] = neighbor.rssi;
                             link[0].setMap(null);
-                            link[0] = createPolyline(lineCoordinates,color);
+                            link[0] = createPolyline(lineCoordinates, neighbor.rssi);
                         }
                     } // create link if it does not already exists
                     else {
-                        var color = getLinkColor(neighbor.rssi);
-                        var l = createPolyline(lineCoordinates,color);
+                        var l = createPolyline(lineCoordinates, neighbor.rssi);
                         LINKS.push([l, neighbor.rssi]);
                     }
                 }
@@ -134,7 +132,9 @@ function udpateMote(mac, lat, lng){
                 if (MOTES[i][1] == null){
                     MOTES[i][1] = createMarker(lat, lng, mac);
                 } else {
-                    // TODO UPDATE MARKER
+                    console.log("update marker")
+                    MOTES[i][1].setMap(null);
+                    MOTES[i][1] = createMarker(lat, lng, mac);
                 }
             }
         }
@@ -153,16 +153,18 @@ function createMarker(lat, lng, content){
     return marker;
 }
 
-function createPolyline(lineCoordinates,color){
-    var tripPath = new google.maps.Polyline({
+function createPolyline(lineCoordinates, rssi){
+    var color = getLinkColor(rssi);
+    var line = new google.maps.Polyline({
           path: lineCoordinates,
           geodesic: true,
           strokeColor: color,
           strokeOpacity: 1.0,
           strokeWeight: 2
     });
-    tripPath.setMap(map);
-    return tripPath
+    line.setMap(map);
+    infoBox(map, line, rssi.toString());
+    return line;
 }
 
 function getLink(LatLng1, LatLng2){
@@ -210,6 +212,7 @@ function infoBox(map, marker, content) {
     var infoWindow = new google.maps.InfoWindow();
     // Attaching a click event to the current marker
     google.maps.event.addListener(marker, "click", function(e) {
+        infoWindow.setPosition(e.latLng);
         infoWindow.setContent(content);
         infoWindow.open(map, marker);
     });
