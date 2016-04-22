@@ -13,6 +13,7 @@ var map;
 var MOTES = [];         // a list of [mac, Marker]
 var LINKS = [];         // a list of [Polyline, rssi]
 var timeout;
+var infoWindow;
 
 //------------------ Init functions ------------------------------------------//
 
@@ -209,7 +210,7 @@ function getLocationFromMac(mac){
  about the marker (sensor location)*/
 
 function infoBox(map, marker, content) {
-    var infoWindow = new google.maps.InfoWindow();
+    infoWindow = new google.maps.InfoWindow();
     // Attaching a click event to the current marker
     google.maps.event.addListener(marker, "click", function(e) {
         infoWindow.setPosition(e.latLng);
