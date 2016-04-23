@@ -213,7 +213,8 @@ class Server(threading.Thread):
         # build InfluxDB query
         query = "SELECT * FROM " + sol_type
         if (sol_type == "SOL_TYPE_DUST_NOTIF_HRNEIGHBORS"):
-            query = query + " WHERE time > '" + utc_time + "' AND time < '" + end_time + "'"
+            query = query + " WHERE time > '" + utc_time
+            query = query + "' AND time < '" + end_time + "'"
             query = query + " AND site='" + site + "'"
         else:
             query = query + " WHERE site='" + site + "'"
