@@ -38,8 +38,12 @@ function initMap() {
 function load_data(utcTime, loop){
     clearLinks();
 
-    if (utcTime == null)
-        utcTime = new Date().toISOString();
+    // if time not given, set default time to current time minux 5 mins
+    if (utcTime == null){
+        currentTime = new Date();
+        currentTime.setMinutes(currentTime.getMinutes() - 30)
+        utcTime     = currentTime.toISOString();
+    }
 
     // MOTE CREATE
     var solType     = "SOL_TYPE_DUST_EVENTMOTECREATE";
