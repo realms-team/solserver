@@ -24,7 +24,14 @@ function initMap() {
     });
     map.setMapTypeId(google.maps.MapTypeId.SATELLITE);
 
-    $('#timepicker').timepicker();
+    load_data();
+
+    $('#timepicker').timepicker({
+        showNowButton: true,
+        showDeselectButton: true,
+        defaultTime: '',  // removes the highlighted time for when the input is empty.
+        showCloseButton: true
+    });
     $( "#datepicker" ).datepicker();
 }
 
@@ -103,6 +110,30 @@ function setDate(){
     load_data(utcTime, noLoop);
 }
 
+//----------------Interface Listeners ---------------------------------------//
+
+$(document).ready(function() {
+    $("#next_time").click(function(event) {
+        var selectedTime =  $('#timepicker').timepicker('getTimeAsDate');
+        // add 5 minutes
+        var newDate = new Date(selectedTime.getTime() + 5*60000)
+        str_date = newDate.getHours().toString() + ":" + newDate.getMinutes().toString();
+        $('#timepicker').timepicker('setTime', str_date);
+        setDate();
+    });
+});
+
+$(document).ready(function() {
+    $("#prev_time").click(function(event) {
+        var selectedTime =  $('#timepicker').timepicker('getTimeAsDate');
+        // remove 5 minutes
+        var newDate = new Date(selectedTime.getTime() - 5*60000)
+        str_date = newDate.getHours().toString() + ":" + newDate.getMinutes().toString();
+        $('#timepicker').timepicker('setTime', str_date);
+        setDate();
+    });
+});
+
 //------------------ Helpers ------------------------------------------------//
 
 function clearLinks(){
@@ -132,8 +163,8 @@ function udpateMote(mac, lat, lng){
             if (MOTES[i][0] == mac){
                 if (MOTES[i][1] == null){
                     MOTES[i][1] = createMarker(lat, lng, mac);
-                } else {
-                    console.log("update marker")
+                } else if (MOTES[i][1].position.lat() != lat ||
+                            MOTES[i][1].position.lng() != lng) {
                     MOTES[i][1].setMap(null);
                     MOTES[i][1] = createMarker(lat, lng, mac);
                 }
@@ -217,5 +248,11 @@ function infoBox(map, marker, content) {
         infoWindow.setContent(content);
         infoWindow.open(map, marker);
     });
+}
+
+function pad2(s_num) {
+    i_num = s_num.parseInt()
+    p_num = (i_num < 10 ? '0' : '') + i_num
+    return p_num.toString()
 }
 

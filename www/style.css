@@ -6,16 +6,16 @@ html, body {
 #map {
   display: inline-block;
   height: 100%;
-  width: 80%;
+  width: 100%;
   padding: 0;
   margin: 0;
 }
 #control_panel{
-    display: inline-block;
-    height: 100%;
-    width:19%;
-    min-width: 200px;
+    position: absolute;
+    top:0;
+    right:0;
     padding: 0;
     margin: 0;
     vertical-align: top;
+    text-align: right;
 }

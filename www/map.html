@@ -13,12 +13,14 @@
     <script type="text/javascript" src="jquery.ui.timepicker.js"></script>
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB8M8hxvNymZavj2R3hkN5ERfbBLp9c3J8&callback=initMap" async defer></script>
   </head>
-  <body onload="load_data()">
+  <body>
     <div id="map"></div>
     <div id="control_panel">
       <input type="text" id="datepicker"><br>
       <input type="text" id="timepicker"><br>
+      <button id="prev_time"><<</button>
       <button id="dateselect" onclick="setDate()">PEACH</button>
+      <button id="next_time">>></button>
     <div>
   </body>
 </html>
