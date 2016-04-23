@@ -205,6 +205,13 @@ class Server(threading.Thread):
         return bottle.static_file(filename, "www")
 
     def _cb_jsonp_GET(self, site, sol_type, utc_time):
+        # clean inputs
+        clean = self._check_map_query(site)
+        clean = clean and self._check_map_query(sol_type)
+        clean = clean and self._check_map_query(utc_time)
+        if not clean :
+            return "Wrong parameters"
+
         # compute time + 30m
         end_time = datetime.datetime.strptime(utc_time, '%Y-%m-%dT%H:%M:%S.%fZ') + \
                         datetime.timedelta(minutes=31)
@@ -220,10 +227,10 @@ class Server(threading.Thread):
             query = query + " WHERE site='" + site + "'"
 
         # send query, parse the result and return the output in json
-        influx_json = requests.get("http://localhost:8086/query?db=realms&q="+query)
+        influx_json = self.influxClient.query(query).raw
         j = ""
-        if len(influx_json.json()['results'][0]) > 0:
-            j = self.sol.influxdb_to_json(influx_json.json())
+        if len(influx_json) > 0:
+            j = self.sol.influxdb_to_json(influx_json)
         return json.dumps(j)
 
     def _cb_echo_POST(self):
@@ -340,7 +347,19 @@ class Server(threading.Thread):
         except subprocess.CalledProcessError:
             returnVal = "ERROR"
         return returnVal
-    
+
+    def _check_map_query(self, query):
+        OK_CHARS = "abcdefghijklmnopqrstuvwxyz0123456789 _-.:%"
+        check = [x for x in query if x.lower() not in OK_CHARS] == []
+
+        # check for wrong keywords
+        WRONG_KEYWORDS = ["drop", "insert", "write"]
+        for word in WRONG_KEYWORDS:
+            if word in query.lower():
+                check = False
+
+        return check
+
 #============================ main ============================================
 
 solserver = None
