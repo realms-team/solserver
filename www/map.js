@@ -25,21 +25,19 @@ function initMap() {
     map.setMapTypeId(google.maps.MapTypeId.SATELLITE);
 
     // set date
-    defaultDate = new Date();
-    $( "#datepicker" ).datepicker({
-        defaultDate: defaultDate.toLocaleDateString(),
-    });
-    $( "#datepicker" ).val(defaultDate.toLocaleDateString())
+    $( "#datepicker" ).datepicker();
+    $( "#datepicker" ).datepicker('setDate', 'today');
 
     // set time
-    defaultDate.setMinutes(defaultDate.getMinutes() - 30);
+    defaultDate = new Date();
     $('#timepicker').timepicker({
         showNowButton: true,
         showDeselectButton: true,
         showCloseButton: true,
     });
-    $('#timepicker').val(defaultDate.toLocaleTimeString('es-AR', { hour: "numeric",
-                                                       minute: "numeric"}));
+    $('#timepicker').timepicker('setTime', defaultDate.toLocaleTimeString(
+                                'es-AR', { hour: "numeric",
+                                minute: "numeric"}));
     load_data();
 }
 
