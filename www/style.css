@@ -11,11 +11,16 @@ html, body {
   margin: 0;
 }
 #control_panel{
+  position: absolute;
+  top:0;
+  right:0;
+  padding: 0;
+  margin: 0;
+  vertical-align: top;
+  text-align: right;
+}
+#links{
     position: absolute;
-    top:0;
-    right:0;
-    padding: 0;
-    margin: 0;
-    vertical-align: top;
-    text-align: right;
+    top: 50px;
+    left: 0;
 }
