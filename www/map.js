@@ -24,31 +24,39 @@ function initMap() {
     });
     map.setMapTypeId(google.maps.MapTypeId.SATELLITE);
 
-    load_data();
+    // set date
+    defaultDate = new Date();
+    $( "#datepicker" ).datepicker({
+        defaultDate: defaultDate.toLocaleDateString(),
+    });
+    $( "#datepicker" ).val(defaultDate.toLocaleDateString())
 
+    // set time
+    defaultDate.setMinutes(defaultDate.getMinutes() - 30);
     $('#timepicker').timepicker({
         showNowButton: true,
         showDeselectButton: true,
-        defaultTime: '',  // removes the highlighted time for when the input is empty.
-        showCloseButton: true
+        showCloseButton: true,
     });
-    $( "#datepicker" ).datepicker();
+    $('#timepicker').val(defaultDate.toLocaleTimeString('es-AR', { hour: "numeric",
+                                                       minute: "numeric"}));
+    load_data();
 }
 
-function load_data(utcTime, loop){
+function load_data(isoTime, loop){
     clearLinks();
 
     // if time not given, set default time to current time minux 5 mins
-    if (utcTime == null){
-        currentTime = new Date();
-        currentTime.setMinutes(currentTime.getMinutes() - 30)
-        utcTime     = currentTime.toISOString();
+    if (isoTime == null){
+        var date = $("#datepicker").val();
+        var time = $("#timepicker").val();
+        var isoTime = new Date(date + " " + time).toISOString();
     }
 
     // MOTE CREATE
     var solType     = "SOL_TYPE_DUST_EVENTMOTECREATE";
     var encType     = encodeURIComponent(solType);
-    var encTime     = encodeURIComponent(utcTime);
+    var encTime     = encodeURIComponent(isoTime);
     $.getJSON("jsonp/ARG_junin/" + encType + "/time/" + encTime, create_mote);
 
     // LINKS CREATE
@@ -109,9 +117,9 @@ function create_links(data){
 function setDate(){
     var date = $("#datepicker").val();
     var time = $("#timepicker").val();
-    var utcTime = new Date(date + " " + time).toISOString();
+    var isoTime = new Date(date + " " + time).toISOString();
     noLoop = 0;
-    load_data(utcTime, noLoop);
+    load_data(isoTime, noLoop);
 }
 
 //----------------Interface Listeners ---------------------------------------//
