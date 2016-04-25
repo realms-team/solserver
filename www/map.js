@@ -14,6 +14,7 @@ var MOTES = [];         // a list of [mac, Marker]
 var LINKS = [];         // a list of [Polyline, rssi]
 var timeout;
 var infoWindow;
+var SITE_TIME_OFFSET = -3
 
 //------------------ Init functions ------------------------------------------//
 
@@ -41,15 +42,15 @@ function initMap() {
     load_data();
 }
 
-function load_data(isoTime, loop){
+function load_data(loop){
     clearLinks();
 
-    // if time not given, set default time to current time minux 5 mins
-    if (isoTime == null){
-        var date = $("#datepicker").val();
-        var time = $("#timepicker").val();
-        var isoTime = new Date(date + " " + time).toISOString();
-    }
+    // set default time to current time minux 5 mins
+    var date    = $("#datepicker").datepicker('getDate');
+    var time    = $("#timepicker").timepicker('getTime').split(':');
+    console.log(time[0] + SITE_TIME_OFFSET)
+    date.setHours(parseInt(time[0]) + SITE_TIME_OFFSET, time[1]);
+    isoTime = date.toISOString()
 
     // MOTE CREATE
     var solType     = "SOL_TYPE_DUST_EVENTMOTECREATE";
@@ -112,14 +113,6 @@ function create_links(data){
     }
 }
 
-function setDate(){
-    var date = $("#datepicker").val();
-    var time = $("#timepicker").val();
-    var isoTime = new Date(date + " " + time).toISOString();
-    noLoop = 0;
-    load_data(isoTime, noLoop);
-}
-
 //----------------Interface Listeners ---------------------------------------//
 
 $(document).ready(function() {
@@ -129,7 +122,7 @@ $(document).ready(function() {
         var newDate = new Date(selectedTime.getTime() + 5*60000)
         str_date = newDate.getHours().toString() + ":" + newDate.getMinutes().toString();
         $('#timepicker').timepicker('setTime', str_date);
-        setDate();
+        load_data(0);
     });
 });
 
@@ -140,7 +133,7 @@ $(document).ready(function() {
         var newDate = new Date(selectedTime.getTime() - 5*60000)
         str_date = newDate.getHours().toString() + ":" + newDate.getMinutes().toString();
         $('#timepicker').timepicker('setTime', str_date);
-        setDate();
+        load_data(0)
     });
 });
 
