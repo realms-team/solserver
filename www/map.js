@@ -1,12 +1,14 @@
 // LINK LIMITS
-var GOOD_LINK_LIMIT     = -70;
-var MEDIUM_LINK_LIMIT   = -80;
-var BAD_LINK_LIMIT      = -90;
+var GOOD_LINK_RSSI      = -70;
+var MEDIUM_LINK_RSSI    = -80;
+var GOOD_LINK_PDR       = 80;
+var MEDIUM_LINK_PDR     = 50;
 
 // LINK COLOR
 var GOOD_LINK_COLOR     = "#00ff00"     // green
 var MEDIUM_LINK_COLOR   = "#ffff00"     // orange
 var BAD_LINK_COLOR      = "#ffff00"     // red
+var UNKNOWN_LINK_COLOR  = "#ffffff"     // white
 
 // Global variables
 var map;
@@ -48,7 +50,6 @@ function load_data(loop){
     // set default time to current time minux 5 mins
     var date    = $("#datepicker").datepicker('getDate');
     var time    = $("#timepicker").timepicker('getTime').split(':');
-    console.log(time[0] + SITE_TIME_OFFSET)
     date.setHours(parseInt(time[0]) + SITE_TIME_OFFSET, time[1]);
     isoTime = date.toISOString()
 
@@ -93,19 +94,30 @@ function create_links(data){
                         crd1,
                         crd2
                     ];
-                    var link = getLink(crd1, crd2);
+                    var link    = getLink(crd1, crd2);
+
+                    // get metric
+                    var pdr     = ((neighbor.numTxPackets- neighbor.numTxFailures)
+                                    /neighbor.numTxPackets
+                                  ) * 100;
+                    var rssi    = neighbor.rssi;
+
+                    // set line parameters
+                    var content =   "RSSI: " + rssi + "dB<br>" +
+                                    "PDR: " + pdr + "%"
+                    var color   = getLinkColor(rssi, pdr);
 
                     // update link if already exists and new rssi is worst
                     if (link != null){
                         if (neighbor.rssi < link[1]){
-                            link[1] = neighbor.rssi;
                             link[0].setMap(null);
-                            link[0] = createPolyline(lineCoordinates, neighbor.rssi);
+                            link[0] = createPolyline(lineCoordinates, content, color);
+                            link[1] = [rssi, pdr];
                         }
                     } // create link if it does not already exists
                     else {
-                        var l = createPolyline(lineCoordinates, neighbor.rssi);
-                        LINKS.push([l, neighbor.rssi]);
+                        var l = createPolyline(lineCoordinates, content, color);
+                        LINKS.push([l, [rssi, pdr]]);
                     }
                 }
             }
@@ -150,13 +162,27 @@ function clearLinks(){
     LINKS.length = 0;
 }
 
-function getLinkColor(rssi){
-    if (rssi>GOOD_LINK_LIMIT)
-        return GOOD_LINK_COLOR;
-    else if ( rssi >= MEDIUM_LINK_LIMIT && rssi <= GOOD_LINK_LIMIT)
-        return MEDIUM_LINK_COLOR;
-    else
-        return BAD_LINK_COLOR;
+function getLinkColor(rssi, pdr){
+    var metric = $("#metric").val()
+
+    if (metric == "rssi"){
+        if (rssi > GOOD_LINK_RSSI)
+            return GOOD_LINK_COLOR;
+        else if (rssi >= MEDIUM_LINK_RSSI && rssi <= GOOD_LINK_RSSI)
+            return MEDIUM_LINK_COLOR;
+        else
+            return BAD_LINK_COLOR;
+    }
+    else if (metric == "pdr"){
+        if (pdr >= GOOD_LINK_PDR)
+            return GOOD_LINK_COLOR;
+        else if (pdr > MEDIUM_LINK_COLOR && pdr < GOOD_LINK_COLOR)
+            return MEDIUM_LINK_COLOR;
+        else if (pdr < 0)
+            return BAD_LINK_COLOR;
+        else
+            return UNKNOWN_LINK_COLOR;
+    }
 }
 
 function udpateMote(mac, lat, lng){
@@ -188,17 +214,19 @@ function createMarker(lat, lng, content){
     return marker;
 }
 
-function createPolyline(lineCoordinates, rssi){
-    var color = getLinkColor(rssi);
+function createPolyline(lineCoordinates, content, color){
+    var opacity = 1.0;
+    if (color == UNKNOWN_LINK_COLOR)
+      opacity = 0.0001;
     var line = new google.maps.Polyline({
           path: lineCoordinates,
           geodesic: true,
           strokeColor: color,
-          strokeOpacity: 1.0,
+          strokeOpacity: opacity,
           strokeWeight: 2
     });
     line.setMap(map);
-    infoBox(map, line, rssi.toString());
+    infoBox(map, line, content);
     return line;
 }
 

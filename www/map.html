@@ -21,6 +21,10 @@
       <button id="prev_time"><<</button>
       <button id="dateselect" onclick="load_data()">PEACH</button>
       <button id="next_time">>></button>
+      <br><br>
+      <button id="metric_rssi" onclick="$('#metric').val('rssi'); load_data();">RSSI</button>
+      <button id="metric_pdr" onclick="$('#metric').val('pdr'); load_data();">PDR</button>
+      <input type="hidden" id="metric" value="pdr">
     <div>
   </body>
 </html>
