@@ -25,14 +25,11 @@ from   ConfigParser             import SafeConfigParser
 # third-party packages
 import bottle
 import influxdb
-import flatdict
-import requests
 
 # project-specific
 import OpenCli
 import Sol
 import SolVersion
-import SolDefines
 import solserver_version
 
 #============================ defines =========================================
@@ -63,7 +60,7 @@ STAT_NUM_OBJECTS_DB_FAIL     = 'STAT_NUM_OBJECTS_DB_FAIL'
 
 def logCrash(threadName,err):
     output  = []
-    output += ["==============================================================="]
+    output += ["============================================================="]
     output += [time.strftime("%m/%d/%Y %H:%M:%S UTC",time.gmtime())]
     output += [""]
     output += ["CRASH in Thread {0}!".format(threadName)]
@@ -163,11 +160,22 @@ class Server(threading.Thread):
         
         # initialize web server
         self.web        = bottle.Bottle()
-        self.web.route(path=['/<filename>',"/"],   method='GET', callback=self._cb_root_GET, name='static')
-        self.web.route(path=['/jsonp/<site>/<sol_type>/time/<utc_time>'], method='GET', callback=self._cb_jsonp_GET)
-        self.web.route(path='/api/v1/echo.json',   method='POST',callback=self._cb_echo_POST)
-        self.web.route(path='/api/v1/status.json', method='GET', callback=self._cb_status_GET)
-        self.web.route(path='/api/v1/o.json',      method='PUT', callback=self._cb_o_PUT)
+        self.web.route(path=['/<filename>',"/"],
+                       method='GET',
+                       callback=self._cb_root_GET,
+                       name='static')
+        self.web.route(path=['/jsonp/<site>/<sol_type>/time/<utc_time>'],
+                       method='GET',
+                       callback=self._cb_jsonp_GET)
+        self.web.route(path='/api/v1/echo.json',
+                       method='POST',
+                       callback=self._cb_echo_POST)
+        self.web.route(path='/api/v1/status.json',
+                       method='GET',
+                       callback=self._cb_status_GET)
+        self.web.route(path='/api/v1/o.json',
+                       method='PUT',
+                       callback=self._cb_o_PUT)
         
         # start the thread
         threading.Thread.__init__(self)
@@ -213,13 +221,15 @@ class Server(threading.Thread):
             return "Wrong parameters"
 
         # compute time + 30m
-        end_time = datetime.datetime.strptime(utc_time, '%Y-%m-%dT%H:%M:%S.%fZ') + \
-                        datetime.timedelta(minutes=31)
+        end_time = datetime.datetime.strptime(
+                        utc_time,
+                        '%Y-%m-%dT%H:%M:%S.%fZ'
+                    ) + datetime.timedelta(minutes=31)
         end_time = end_time.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
         # build InfluxDB query
         query = "SELECT * FROM " + sol_type
-        if (sol_type == "SOL_TYPE_DUST_NOTIF_HRNEIGHBORS"):
+        if sol_type == "SOL_TYPE_DUST_NOTIF_HRNEIGHBORS":
             query = query + " WHERE time > '" + utc_time
             query = query + "' AND time < '" + end_time + "'"
             query = query + " AND site='" + site + "'"
@@ -290,7 +300,9 @@ class Server(threading.Thread):
             # abort if malformed JSON body
             if bottle.request.json is None:
                 raise bottle.HTTPResponse(
-                    body   = json.dumps({'error': 'Malformed JSON body'}),
+                    body   = json.dumps(
+                                {'error': 'Malformed JSON body'}
+                            ),
                     status = 400,
                     headers= {'Content-Type': 'application/json'},
                 )
@@ -300,7 +312,9 @@ class Server(threading.Thread):
                 sol_binl = self.sol.http_to_bin(bottle.request.json)
             except:
                 raise bottle.HTTPResponse(
-                    body   = json.dumps({'error': 'Malformed JSON body contents'}),
+                    body   = json.dumps(
+                                {'error': 'Malformed JSON body contents'}
+                            ),
                     status = 400,
                     headers= {'Content-Type': 'application/json'},
                 )
@@ -365,8 +379,6 @@ class Server(threading.Thread):
 solserver = None
 
 def quitCallback():
-    global solserver
-    
     solserver.close()
 
 def cli_cb_stats(params):
