@@ -164,7 +164,7 @@ class Server(threading.Thread):
                        method='GET',
                        callback=self._cb_root_GET,
                        name='static')
-        self.web.route(path=['/jsonp/<site>/<sol_type>/time/<utc_time>'],
+        self.web.route(path=['/api/v1/jsonp/<site>/<sol_type>/time/<utc_time>'],
                        method='GET',
                        callback=self._cb_jsonp_GET)
         self.web.route(path='/api/v1/echo.json',

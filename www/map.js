@@ -58,12 +58,12 @@ function load_data(loop){
     var solType     = "SOL_TYPE_DUST_EVENTMOTECREATE";
     var encType     = encodeURIComponent(solType);
     var encTime     = encodeURIComponent(isoTime);
-    $.getJSON("jsonp/ARG_junin/" + encType + "/time/" + encTime, create_mote);
+    $.getJSON("api/v1/jsonp/ARG_junin/" + encType + "/time/" + encTime, create_mote);
 
     // LINKS CREATE
     solType         = "SOL_TYPE_DUST_NOTIF_HRNEIGHBORS";
     encType         = encodeURIComponent(solType);
-    $.getJSON("jsonp/ARG_junin/" + encType + "/time/" + encTime, create_links);
+    $.getJSON("api/v1/jsonp/ARG_junin/" + encType + "/time/" + encTime, create_links);
 
     if (loop != 0)
         timeout = setTimeout(load_data, 30000);
