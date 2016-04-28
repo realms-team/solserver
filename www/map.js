@@ -48,9 +48,10 @@ function load_data(loop){
     clearLinks();
 
     // set default time to current time minux 5 mins
-    var date    = $("#datepicker").datepicker('getDate');
-    var time    = $("#timepicker").timepicker('getTime').split(':');
-    date.setHours(parseInt(time[0]) + SITE_TIME_OFFSET, time[1]);
+    var date        = $("#datepicker").datepicker('getDate');
+    var time        = $("#timepicker").timepicker('getTime').split(':');
+    var localOffset = new Date().getTimezoneOffset()/60;
+    date.setHours(parseInt(time[0]) - localOffset, time[1]);
     isoTime = date.toISOString()
 
     // MOTE CREATE
@@ -103,7 +104,7 @@ function create_links(data){
                     var rssi    = neighbor.rssi;
 
                     // set line parameters
-                    var content =   "RSSI: " + rssi + "dB<br>" +
+                    var content =   "RSSI: " + rssi + "dBm<br>" +
                                     "PDR: " + pdr + "%"
                     var color   = getLinkColor(rssi, pdr);
 
@@ -244,14 +245,6 @@ function getLink(LatLng1, LatLng2){
     return null
 }
 
-function markerExists(LatLng){
-    for (i in MOTES) {
-        if (MOTES[i][0].getPosition().toString() == LatLng.toString())
-          return 1;
-    }
-    return 0;
-}
-
 function getLocationFromId(moteId){
     if (MOTES[moteId][1] != null)
         return MOTES[moteId][1].position;
@@ -280,10 +273,3 @@ function infoBox(map, marker, content) {
         infoWindow.open(map, marker);
     });
 }
-
-function pad2(s_num) {
-    i_num = s_num.parseInt()
-    p_num = (i_num < 10 ? '0' : '') + i_num
-    return p_num.toString()
-}
-
