@@ -11,6 +11,7 @@ import math
 import influxdb
 import Sol
 import matplotlib.pyplot as plt
+import numpy
 
 #============================ defines =========================================
 
@@ -83,47 +84,56 @@ def main():
             if m != None:
                 for n in m['neighbors']:
                     if n != None and int(n['numTxPackets']) != 0 and 'distance' in n:
+                        nbrId = n['neighborId']
                         pdr         = (int(n['numTxPackets'])-int(n['numTxFailures'])
                                         )/float(n['numTxPackets'])*100
-                        mote_type   = 0
+                        mote1_type   = 0
                         if m['value']['macAddress'] in MAC_LONG_RANGE:
-                            mote_type = 2
+                            mote1_type = 2
                         if m['value']['macAddress'] in MAC_MEDIUM_RANGE:
-                            mote_type = 1
+                            mote1_type = 1
+                        mote2_type   = 0
+                        if motes[nbrId]['value']['macAddress'] in MAC_LONG_RANGE:
+                            mote2_type = 2
+                        if motes[nbrId]['value']['macAddress'] in MAC_MEDIUM_RANGE:
+                            mote2_type = 1
                         fw.write(str(m['value']['macAddress']) + \
-                                " " + str(motes[n['neighborId']]['value']['macAddress']) + \
+                                " " + str(motes[nbrId]['value']['macAddress']) + \
                                 " " + str(n['distance']) + \
                                 " " + str(pdr) +
-                                " " + str(mote_type) + "\n"
+                                " " + str(mote1_type) +
+                                " " + str(mote2_type) + "\n"
                                 )
         fw.close()
 
         # create graph
         plt.figure()
         with open('pdr_dist.out') as f:
-            x_short     = []
-            y_short     = []
-            x_medium    = []
-            y_medium    = []
-            x_long      = []
-            y_long      = []
+            x_series    = [[[],[],[]],[[],[],[]],[[],[],[]]]
+            y_series    = [[[],[],[]],[[],[],[]],[[],[],[]]]
             for line in f:
                 line_list = line.split(' ')
-                if int(line_list[4]) == 0:
-                    x_short.append(float(line_list[2]))
-                    y_short.append(float(line_list[3]))
-                if int(line_list[4]) == 1:
-                    x_medium.append(float(line_list[2]))
-                    y_medium.append(float(line_list[3]))
-                if int(line_list[4]) == 2:
-                    x_long.append(float(line_list[2]))
-                    y_long.append(float(line_list[3]))
+                mote1_type  = int(line_list[4])
+                mote2_type  = int(line_list[5])
+                pdr         = float(line_list[2])
+                dist        = float(line_list[3])
+
+                x_series[mote1_type][mote2_type].append(pdr)
+                y_series[mote1_type][mote2_type].append(dist)
         fw.close()
         plt.xlabel('Distance (m)')
         plt.ylabel('PDR')
-        plt.plot(x_short, y_short, marker='o', linestyle='None', color='r', label='DC9003 chip ant.')
-        plt.plot(x_medium, y_medium, marker='o', linestyle='None', color='b', label='DC9018 ext. ant.')
-        plt.plot(x_long, y_long, marker='o', linestyle='None', color='g', label='Long-Range')
+        colors = iter(['r', 'b', 'g', 'c', 'm', 'y', 'k', 'w', '0.50'])
+        mote_types=['DC9003', 'DC9018', 'LongRange']
+        for i in range(0, len(x_series)):
+            for j in range(0, len(y_series)):
+                plt.plot(x_series[i][j],
+                        y_series[i][j],
+                        marker='o',
+                        linestyle='None',
+                        color=next(colors),
+                        label=mote_types[i]+' to '+mote_types[j]
+                        )
         plt.legend()
         plt.show()
 
