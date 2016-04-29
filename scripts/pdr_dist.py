@@ -51,18 +51,18 @@ def main():
         influx_json = influxClient.query(query).raw
         res = sol.influxdb_to_json(influx_json)
 
-        # update motes location and populate neighbors list
+        # update motes location
         for r in res:
             moteId = _getMoteIdFromMac(motes, r['mac'])
             if moteId != -1:
                 for n in r['value']['neighbors']:
-                    motes[moteId]['neighbors'][n['neighborId']] = n
                     nbrId = n['neighborId']
                     if motes[nbrId] != None:
                         motes[nbrId]['value']['latitude'] = r['value']['latitude']
                         motes[nbrId]['value']['longitude'] = r['value']['longitude']
 
         # compute distance
+        fw = open('pdr_dist.out', 'w')
         for r in res:
             moteId = _getMoteIdFromMac(motes, r['mac'])
             if moteId != -1:
@@ -70,40 +70,40 @@ def main():
                     nbrId = n['neighborId']
                     if motes[nbrId] != None:
                         # compute distance with neighbor
+                        print r['value']['latitude']
+                        print motes[nbrId]['value']['latitude']
                         dist    = _distance_on_unit_sphere(
                                     float(r['value']['latitude']),
                                     float(r['value']['longitude']),
                                     float(motes[nbrId]['value']['latitude']),
                                     float(motes[nbrId]['value']['longitude'])
                                 )
-                        motes[moteId]['neighbors'][nbrId]['distance'] = dist
 
-        # write result
-        fw = open('pdr_dist.out', 'w')
-        for m in motes:
-            if m != None:
-                for n in m['neighbors']:
-                    if n != None and int(n['numTxPackets']) != 0 and 'distance' in n:
-                        nbrId = n['neighborId']
-                        pdr         = (int(n['numTxPackets'])-int(n['numTxFailures'])
+                        # compute pdr with neighbor
+                        if int(n['numTxPackets']) != 0:
+                            pdr         = (int(n['numTxPackets'])-int(n['numTxFailures'])
                                         )/float(n['numTxPackets'])*100
-                        mote1_type   = 0
-                        if m['value']['macAddress'] in MAC_LONG_RANGE:
-                            mote1_type = 2
-                        if m['value']['macAddress'] in MAC_MEDIUM_RANGE:
-                            mote1_type = 1
-                        mote2_type   = 0
-                        if motes[nbrId]['value']['macAddress'] in MAC_LONG_RANGE:
-                            mote2_type = 2
-                        if motes[nbrId]['value']['macAddress'] in MAC_MEDIUM_RANGE:
-                            mote2_type = 1
-                        fw.write(str(m['value']['macAddress']) + \
-                                " " + str(motes[nbrId]['value']['macAddress']) + \
-                                " " + str(n['distance']) + \
-                                " " + str(pdr) +
-                                " " + str(mote1_type) +
-                                " " + str(mote2_type) + "\n"
-                                )
+
+                            # find mote device type
+                            mote1_type   = 0
+                            if m['value']['macAddress'] in MAC_LONG_RANGE:
+                                mote1_type = 2
+                            if m['value']['macAddress'] in MAC_MEDIUM_RANGE:
+                                mote1_type = 1
+                            mote2_type   = 0
+                            if motes[nbrId]['value']['macAddress'] in MAC_LONG_RANGE:
+                                mote2_type = 2
+                            if motes[nbrId]['value']['macAddress'] in MAC_MEDIUM_RANGE:
+                                mote2_type = 1
+
+                            # write stat
+                            fw.write(str(motes[moteId]['value']['macAddress']) + \
+                                    " " + str(motes[nbrId]['value']['macAddress']) + \
+                                    " " + str(dist) + \
+                                    " " + str(pdr) +
+                                    " " + str(mote1_type) +
+                                    " " + str(mote2_type) + "\n"
+                                    )
         fw.close()
 
         # create graph
@@ -123,13 +123,14 @@ def main():
         fw.close()
         plt.xlabel('Distance (m)')
         plt.ylabel('PDR')
-        colors = iter(['r', 'b', 'g', 'c', 'm', 'y', 'k', 'w', '0.50'])
+        colors  = iter(['r', 'b', 'g', 'c', 'm', 'y', 'k', 'w', '0.50'])
+        markers = iter(['^', '.', 'o', '*', 'p', 's', 'x', 'D', 'h'])
         mote_types=['DC9003', 'DC9018', 'LongRange']
         for i in range(0, len(x_series)):
             for j in range(0, len(y_series)):
                 plt.plot(x_series[i][j],
                         y_series[i][j],
-                        marker='o',
+                        marker=next(markers),
                         linestyle='None',
                         color=next(colors),
                         label=mote_types[i]+' to '+mote_types[j]
