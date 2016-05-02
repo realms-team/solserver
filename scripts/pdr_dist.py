@@ -70,8 +70,6 @@ def main():
                     nbrId = n['neighborId']
                     if motes[nbrId] != None:
                         # compute distance with neighbor
-                        print r['value']['latitude']
-                        print motes[nbrId]['value']['latitude']
                         dist    = _distance_on_unit_sphere(
                                     float(r['value']['latitude']),
                                     float(r['value']['longitude']),
@@ -86,9 +84,9 @@ def main():
 
                             # find mote device type
                             mote1_type   = 0
-                            if m['value']['macAddress'] in MAC_LONG_RANGE:
+                            if r['mac'] in MAC_LONG_RANGE:
                                 mote1_type = 2
-                            if m['value']['macAddress'] in MAC_MEDIUM_RANGE:
+                            if r['mac'] in MAC_MEDIUM_RANGE:
                                 mote1_type = 1
                             mote2_type   = 0
                             if motes[nbrId]['value']['macAddress'] in MAC_LONG_RANGE:
@@ -97,7 +95,7 @@ def main():
                                 mote2_type = 1
 
                             # write stat
-                            fw.write(str(motes[moteId]['value']['macAddress']) + \
+                            fw.write(str(r['mac']) + \
                                     " " + str(motes[nbrId]['value']['macAddress']) + \
                                     " " + str(dist) + \
                                     " " + str(pdr) +
