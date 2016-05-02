@@ -149,12 +149,12 @@ class CherryPySSL(bottle.ServerAdapter):
             server.stop()
 
 class Server(threading.Thread):
-    
+
     def __init__(self,tcpport):
-        
+
         # store params
         self.tcpport    = tcpport
-        
+
         # local variables
         AppData()
         self.sol                  = Sol.Sol()
@@ -165,7 +165,7 @@ class Server(threading.Thread):
             port        = '8086',
             database    = 'realms'
         )
-        
+
         # initialize web server
         self.web        = bottle.Bottle()
         self.web.route(path=['/<filename>',"/"],
@@ -184,13 +184,13 @@ class Server(threading.Thread):
         self.web.route(path='/api/v1/o.json',
                        method='PUT',
                        callback=self._cb_o_PUT)
-        
+
         # start the thread
         threading.Thread.__init__(self)
         self.name       = 'Server'
         self.daemon     = True
         self.start()
-    
+
     def run(self):
         try:
             self.web.run(
@@ -200,7 +200,7 @@ class Server(threading.Thread):
                 quiet  = True,
                 debug  = False,
             )
-        
+
         except bottle.BottleException:
             raise
 
@@ -208,17 +208,17 @@ class Server(threading.Thread):
             logCrash(self.name,err)
 
         log.info("Web server started")
-    
+
     #======================== public ==========================================
-    
+
     def close(self):
         # bottle thread is daemon, it will close when main thread closes
         pass
-    
+
     #======================== private =========================================
-    
+
     #=== JSON request handler
-    
+
     def _cb_root_GET(self, filename="map.html"):
         return bottle.static_file(filename, "www")
 
@@ -257,28 +257,28 @@ class Server(threading.Thread):
         try:
             # update stats
             AppData().incrStats(STAT_NUM_JSON_REQ)
-            
+
             # authorize the client
             self._authorizeClient()
-            
+
             bottle.response.content_type = bottle.request.content_type
             return bottle.request.body.read()
-        
+
         except bottle.BottleException:
             raise
-           
+
         except Exception as err:
             logCrash(self.name,err)
             raise
-    
+
     def _cb_status_GET(self):
         try:
             # update stats
             AppData().incrStats(STAT_NUM_JSON_REQ)
-            
+
             # authorize the client
             self._authorizeClient()
-            
+
             returnVal = {
                 'version solserver': solserver_version.VERSION,
                 'version Sol': SolVersion.VERSION,
@@ -298,15 +298,15 @@ class Server(threading.Thread):
         except Exception as err:
             logCrash(self.name,err)
             raise
-    
+
     def _cb_o_PUT(self):
         try:
             # update stats
             AppData().incrStats(STAT_NUM_JSON_REQ)
-            
+
             # authorize the client
             self._authorizeClient()
-            
+
             # abort if malformed JSON body
             if bottle.request.json is None:
                 raise bottle.HTTPResponse(
@@ -332,11 +332,11 @@ class Server(threading.Thread):
             # bin->json->influxdb format, then write to put database
             sol_influxdbl = []
             for sol_bin in sol_binl:
-                
+
                 # convert bin->json->influxdb
                 sol_json          = self.sol.bin_to_json(sol_bin)
                 sol_influxdbl    += [self.sol.json_to_influxdb(sol_json)]
-                
+
             # write to database
             try:
                 self.influxClient.write_points(sol_influxdbl)
@@ -352,9 +352,9 @@ class Server(threading.Thread):
         except Exception as err:
             logCrash(self.name,err)
             raise
-    
+
     #=== misc
-    
+
     def _authorizeClient(self):
         if bottle.request.headers.get('X-REALMS-Token')!=self.solservertoken:
             AppData().incrStats(STAT_NUM_JSON_UNAUTHORIZED)
@@ -365,7 +365,7 @@ class Server(threading.Thread):
                 status = 401,
                 headers= {'Content-Type': 'application/json'},
             )
-    
+
     def _exec_cmd(self,cmd):
         returnVal = None
         try:
@@ -468,12 +468,12 @@ if __name__ == '__main__':
     # parse the command line
     parser = OptionParser("usage: %prog [options]")
     parser.add_option(
-        "-t", "--tcpport", dest="tcpport", 
+        "-t", "--tcpport", dest="tcpport",
         default=DEFAULT_TCPPORT,
         help="TCP port to start the JSON API on."
     )
     (options, args) = parser.parse_args()
-    
+
     main(
         options.tcpport,
     )
