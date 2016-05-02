@@ -5,3 +5,4 @@
 /solserver.ppk
 /solserver.crashlog
 /solmanager.cert
+*.log
