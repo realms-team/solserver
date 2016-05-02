@@ -21,6 +21,8 @@ import traceback
 import datetime
 from   optparse                 import OptionParser
 from   ConfigParser             import SafeConfigParser
+import logging
+import logging.config
 
 # third-party packages
 import bottle
@@ -31,6 +33,12 @@ import OpenCli
 import Sol
 import SolVersion
 import solserver_version
+
+#============================ logging =========================================
+
+logging.config.fileConfig('logging.conf')
+log = logging.getLogger('solserver')
+log.setLevel(logging.DEBUG)
 
 #============================ defines =========================================
 
@@ -74,8 +82,7 @@ def logCrash(threadName,err):
     # update stats
     AppData().incrStats(STAT_NUM_CRASHES)
     print output
-    with open(DEFAULT_CRASHLOG,'a') as f:
-        f.write(output)
+    log.critical(output)
 
 #============================ classes =========================================
 
@@ -137,6 +144,7 @@ class CherryPySSL(bottle.ServerAdapter):
         )
         try:
             server.start()
+            log.info("Server started")
         finally:
             server.stop()
 
@@ -198,6 +206,8 @@ class Server(threading.Thread):
 
         except Exception as err:
             logCrash(self.name,err)
+
+        log.info("Web server started")
     
     #======================== public ==========================================
     
@@ -348,6 +358,8 @@ class Server(threading.Thread):
     def _authorizeClient(self):
         if bottle.request.headers.get('X-REALMS-Token')!=self.solservertoken:
             AppData().incrStats(STAT_NUM_JSON_UNAUTHORIZED)
+            log.warn("Unauthorized - Invalid Token: %s",
+                    bottle.request.headers.get('X-REALMS-Token'))
             raise bottle.HTTPResponse(
                 body   = json.dumps({'error': 'Unauthorized'}),
                 status = 401,
@@ -380,6 +392,7 @@ solserver = None
 
 def quitCallback():
     solserver.close()
+    log.info("================================== Solserver stopped")
 
 def cli_cb_stats(params):
     stats = AppData().getStats()
@@ -391,12 +404,18 @@ def cli_cb_stats(params):
 
 def main(tcpport):
     global solserver
-    
+
     # create the server instance
     solserver = Server(
         tcpport
     )
-    
+    log.info("================================== Solserver started")
+
+    try:
+        print boom
+    except Exception as err:
+        logCrash('toto',err)
+
     # start the CLI interface
     cli = OpenCli.OpenCli(
         "Server",
@@ -417,7 +436,7 @@ def main(tcpport):
 if __name__ == '__main__':
     # parse the config file
     cf_parser = SafeConfigParser()
-    cf_parser.read(DEFAULT_CONFIGFILE) 
+    cf_parser.read(DEFAULT_CONFIGFILE)
 
     if cf_parser.has_section('solmanager'):
         if cf_parser.has_option('solmanager','token'):
@@ -434,10 +453,22 @@ if __name__ == '__main__':
             DEFAULT_SOLSERVERCERT = cf_parser.get('solserver','certfile')
         if cf_parser.has_option('solserver','privatekey'):
             DEFAULT_SOLSERVERPRIVKEY = cf_parser.get('solserver','privatekey')
-        if cf_parser.has_option('solserver','crashlogfile'):
-            DEFAULT_CRASHLOG = cf_parser.get('solserver','crashlogfile')
         if cf_parser.has_option('solserver','backupfile'):
             DEFAULT_BACKUPFILE = cf_parser.get('solserver','backupfile')
+    log.debug("Configuration:\n" +\
+            "\tSOL_SERVER_HOST: '%s'\n"             +\
+            "\tDEFAULT_TCPPORT: %d\n"               +\
+            "\tDEFAULT_SOLSERVERTOKEN: '%s'\n"      +\
+            "\tDEFAULT_SOLSERVERCERT:  '%s'\n"      +\
+            "\tDEFAULT_SOLSERVERPRIVKEY: '%s'\n"    +\
+            "\tDEFAULT_BACKUPFILE: '%s'\n"          ,
+            DEFAULT_SOLSERVER,
+            DEFAULT_TCPPORT,
+            DEFAULT_SOLSERVERTOKEN,
+            DEFAULT_SOLSERVERCERT,
+            DEFAULT_SOLSERVERPRIVKEY,
+            DEFAULT_BACKUPFILE
+            )
 
     # parse the command line
     parser = OptionParser("usage: %prog [options]")
