@@ -411,11 +411,6 @@ def main(tcpport):
     )
     log.info("================================== Solserver started")
 
-    try:
-        print boom
-    except Exception as err:
-        logCrash('toto',err)
-
     # start the CLI interface
     cli = OpenCli.OpenCli(
         "Server",
