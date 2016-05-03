@@ -12,8 +12,8 @@ var UNKNOWN_LINK_COLOR  = "#ffffff"     // white
 
 // Global variables
 var map;
-var MOTES = [];         // a list of [mac, Marker]
-var LINKS = [];         // a list of [Polyline, rssi]
+var motes   = [];         // a list of motes, indexed by id
+var links   = [];         // a list of links
 var timeout;
 var infoWindow;
 var SITE_TIME_OFFSET = -3
@@ -52,13 +52,13 @@ function load_data(loop){
     var time        = $("#timepicker").timepicker('getTime').split(':');
     var localOffset = new Date().getTimezoneOffset()/60;
     date.setHours(parseInt(time[0]) - localOffset, time[1]);
-    isoTime = date.toISOString()
+    isoTime = date.toISOString();
 
     // MOTE CREATE
     var solType     = "SOL_TYPE_DUST_EVENTMOTECREATE";
     var encType     = encodeURIComponent(solType);
     var encTime     = encodeURIComponent(isoTime);
-    $.getJSON("api/v1/jsonp/ARG_junin/" + encType + "/time/" + encTime, create_mote);
+    $.getJSON("api/v1/jsonp/ARG_junin/" + encType + "/time/" + encTime, create_motes);
 
     // LINKS CREATE
     solType         = "SOL_TYPE_DUST_NOTIF_HRNEIGHBORS";
@@ -73,28 +73,36 @@ function load_data(loop){
 
 //------------------ Main functions ------------------------------------------//
 
-function create_mote(data){
+// populate the motes list
+function create_motes(data){
     for (var i=0; i < data.length; i++) {
         // populate table
-        MOTES[data[i].value.moteId] = [data[i].value.macAddress, null]
+        motes[data[i].value.moteId] = {
+            "mac"       : data[i].value.macAddress,
+            "marker"    : null
+        }
     }
 }
 
 function create_links(data){
+
+    // update motes location
     for (var i=0; i < data.length; i++) {
-        udpateMote(data[i].mac, data[i].value.latitude,data[i].value.longitude);
+        udpateMoteLocation(
+            data[i].mac,
+            data[i].value.latitude,
+            data[i].value.longitude);
     }
+
+    // create links
     for (var i=0; i < data.length; i++) {
         for (var j=0; j<data[i].value.neighbors.length; j++){
             var neighbor = data[i].value.neighbors[j];
-            if (neighbor.neighborId in MOTES){
+            if (neighbor.neighborId in motes){
                 var crd1 = getLocationFromMac(data[i].mac);
                 var crd2 = getLocationFromId(neighbor.neighborId)
                 if (crd1 != null && crd2 != null){
-                    var lineCoordinates = [
-                        crd1,
-                        crd2
-                    ];
+                    var lineCoords = [crd1, crd2];
                     var link    = getLink(crd1, crd2);
 
                     // get metric
@@ -110,15 +118,23 @@ function create_links(data){
 
                     // update link if already exists and new rssi is worst
                     if (link != null){
-                        if (neighbor.rssi < link[1]){
-                            link[0].setMap(null);
-                            link[0] = createPolyline(lineCoordinates, content, color);
-                            link[1] = [rssi, pdr];
+                        if (neighbor.rssi < link.metric.rssi){
+                            link.pline.setMap(null);
+                            link.pline          = createPolyline(lineCoords, content, color);
+                            link.metric.rssi    = rssi;
+                            link.metric.pdr     = pdr;
                         }
                     } // create link if it does not already exists
                     else {
-                        var l = createPolyline(lineCoordinates, content, color);
-                        LINKS.push([l, [rssi, pdr]]);
+                        var l = createPolyline(lineCoords, content, color);
+                        newLink = {
+                            "pline" :   l,
+                            "metric":   {
+                                    "rssi"  : rssi,
+                                    "pdr"   : pdr,
+                                }
+                        }
+                        links.push(newLink);
                     }
                 }
             }
@@ -154,13 +170,13 @@ $(document).ready(function() {
 
 function clearLinks(){
     // remove links
-    for (var i=0; i<LINKS.length; i++) {
-        if (i in LINKS){
-            LINKS[i][0].setMap(null);
+    for (var i=0; i<links.length; i++) {
+        if (i in links){
+            links[i].pline.setMap(null);
         }
     }
-    LINKS = [];
-    LINKS.length = 0;
+    links = [];
+    links.length = 0;
 }
 
 function getLinkColor(rssi, pdr){
@@ -186,17 +202,17 @@ function getLinkColor(rssi, pdr){
     }
 }
 
-function udpateMote(mac, lat, lng){
+function udpateMoteLocation(mac, lat, lng){
     var moteId = null;
-    for (var i=0; i<MOTES.length; i++) {
-        if (i in MOTES){
-            if (MOTES[i][0] == mac){
-                if (MOTES[i][1] == null){
-                    MOTES[i][1] = createMarker(lat, lng, mac);
-                } else if (MOTES[i][1].position.lat() != lat ||
-                            MOTES[i][1].position.lng() != lng) {
-                    MOTES[i][1].setMap(null);
-                    MOTES[i][1] = createMarker(lat, lng, mac);
+    for (var i=0; i<motes.length; i++) {
+        if (i in motes){
+            if (motes[i].mac == mac){
+                if (motes[i].marker == null){
+                    motes[i].marker = createMarker(lat, lng, mac);
+                } else if (motes[i].marker.position.lat() != lat ||
+                            motes[i].marker.position.lng() != lng) {
+                    motes[i].marker.setMap(null);
+                    motes[i].marker = createMarker(lat, lng, mac);
                 }
             }
         }
@@ -232,32 +248,33 @@ function createPolyline(lineCoordinates, content, color){
 }
 
 function getLink(LatLng1, LatLng2){
-    for (i=0; i<LINKS.length; i++) {
-        link = LINKS[i][0];
+    for (i=0; i<links.length; i++) {
+        link = links[i].pline;
         var coord1 = "("+link.getPath().getAt(0).lat()+", "+link.getPath().getAt(0).lng()+")"
         var coord2 = "("+link.getPath().getAt(1).lat()+", "+link.getPath().getAt(1).lng()+")"
         if ( ((LatLng1.toString() == coord1) && (LatLng2.toString() == coord2)) ||
              ((LatLng2.toString() == coord1) && (LatLng1.toString() == coord2))
            ){
-            return LINKS[i]
+            return links[i]
         }
     }
     return null
 }
 
 function getLocationFromId(moteId){
-    if (MOTES[moteId][1] != null)
-        return MOTES[moteId][1].position;
+    if (motes[moteId].marker != null)
+        return motes[moteId].marker.position;
     else
-        return null
+        return null;
 }
 
 function getLocationFromMac(mac){
-    for( i=0; i<MOTES.length; i++ ) {
-        if (i in MOTES && MOTES[i][0] == mac){
-            return MOTES[i][1].position;
+    for( i=0; i<motes.length; i++ ) {
+        if (i in motes && motes[i].mac == mac){
+            return motes[i].marker.position;
         }
     }
+    return null;
     console.log("MAC not found:" + mac)
 }
 
