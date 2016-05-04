@@ -239,13 +239,11 @@ class Server(threading.Thread):
 
         # build InfluxDB query
         query = "SELECT * FROM " + sol_type
+        query = query + " WHERE site='" + site + "'"
         if sol_type == "SOL_TYPE_DUST_NOTIF_HRNEIGHBORS":
-            query = query + " WHERE time > '" + utc_time
-            query = query + "' AND time < '" + end_time + "'"
-            query = query + " AND site='" + site + "'"
+            query = query + ' GROUP BY "mac" ORDER BY time DESC LIMIT 1'
         else:
-            query = query + " WHERE site='" + site + "'"
-        query = query + "ORDER BY time DESC"
+            query = query + ' GROUP BY "mac" ORDER BY time DESC'
 
         # send query, parse the result and return the output in json
         influx_json = self.influxClient.query(query).raw
