@@ -16,7 +16,8 @@ var motes   = [];         // a list of motes, indexed by id
 var links   = [];         // a list of links
 var timeout;
 var infoWindow;
-var SITE_TIME_OFFSET = -3
+var SITE_TIME_OFFSET    = -3
+var DEFAULT_PDR         = 101 // init to impossible value
 
 //------------------ Init functions ------------------------------------------//
 
@@ -41,7 +42,7 @@ function initMap() {
     $('#timepicker').timepicker('setTime', defaultDate.toLocaleTimeString(
                                 'es-AR', { hour: "numeric",
                                 minute: "numeric"}));
-    load_data();
+    load_data(1);
 }
 
 function load_data(loop){
@@ -65,7 +66,7 @@ function load_data(loop){
     encType         = encodeURIComponent(solType);
     $.getJSON("api/v1/jsonp/ARG_junin/" + encType + "/time/" + encTime, create_links);
 
-    if (loop != 0)
+    if (loop == 1)
         timeout = setTimeout(load_data, 30000);
     else
         clearTimeout(timeout)
@@ -106,28 +107,42 @@ function create_links(data){
                     var link    = getLink(crd1, crd2);
 
                     // get metric
-                    var pdr     = ((neighbor.numTxPackets- neighbor.numTxFailures)
+                    var pdr = DEFAULT_PDR //init to unpossible value
+                    if (neighbor.numTxPackets > 0){
+                        pdr     = ((neighbor.numTxPackets - neighbor.numTxFailures)
                                     /neighbor.numTxPackets
-                                  ) * 100;
+                                ) * 100;
+                    }
                     var rssi    = neighbor.rssi;
 
-                    // set line parameters
-                    var content =   "RSSI: " + rssi + "dBm<br>" +
-                                    "PDR: " + pdr + "%"
-                    var color   = getLinkColor(rssi, pdr);
 
-                    // update link if already exists and new rssi is worst
+                    // update link if already exists
                     if (link != null){
-                        if (neighbor.rssi < link.metric.rssi){
-                            link.pline.setMap(null);
-                            link.pline          = createPolyline(lineCoords, content, color);
-                            link.metric.rssi    = rssi;
-                            link.metric.pdr     = pdr;
-                        }
+                        link.metric.rssi    = Math.min(rssi, link.metric.rssi)
+                        link.metric.pdr     = Math.min(pdr, link.metric.pdr)
+
+                        link.pline.setMap(null);
+                        var color   = getLinkColor(link.metric.rssi, link.metric.pdr);
+                        // set line parameters
+                        if (link.metric.pdr == DEFAULT_PDR)
+                          s_pdr = "No Tx"
+                        else
+                          s_pdr = link.metric.pdr + "%"
+                        var content =   "RSSI: " + rssi + "dBm<br>" +
+                                        "PDR: " + s_pdr
+                        link.pline  = createPolyline(lineCoords, content, color);
                     } // create link if it does not already exists
                     else {
+                        var color   = getLinkColor(rssi, pdr);
+                        // set line parameters
+                        if (pdr == DEFAULT_PDR)
+                          s_pdr = "No Tx"
+                        else
+                          s_pdr = pdr + "%"
+                        var content =   "RSSI: " + rssi + "dBm<br>" +
+                                        "PDR: " + s_pdr
                         var l = createPolyline(lineCoords, content, color);
-                        newLink = {
+                        var newLink = {
                             "pline" :   l,
                             "metric":   {
                                     "rssi"  : rssi,
@@ -138,6 +153,7 @@ function create_links(data){
                     }
                 }
             }
+            else {console.log("ID not found:" + neighbor.neighborId);}
         }
     }
 }
@@ -191,14 +207,12 @@ function getLinkColor(rssi, pdr){
             return BAD_LINK_COLOR;
     }
     else if (metric == "pdr"){
+        if (pdr == DEFAULT_PDR)
+            return UNKNOWN_LINK_COLOR;
         if (pdr >= GOOD_LINK_PDR)
             return GOOD_LINK_COLOR;
         else if (pdr > MEDIUM_LINK_COLOR && pdr < GOOD_LINK_COLOR)
             return MEDIUM_LINK_COLOR;
-        else if (pdr < 0)
-            return BAD_LINK_COLOR;
-        else
-            return UNKNOWN_LINK_COLOR;
     }
 }
 
@@ -232,24 +246,22 @@ function createMarker(lat, lng, content){
 }
 
 function createPolyline(lineCoordinates, content, color){
-    var opacity = 1.0;
-    if (color == UNKNOWN_LINK_COLOR)
-      opacity = 0.0001;
     var line = new google.maps.Polyline({
           path: lineCoordinates,
           geodesic: true,
           strokeColor: color,
-          strokeOpacity: opacity,
           strokeWeight: 2
     });
-    line.setMap(map);
-    infoBox(map, line, content);
+    if (color != UNKNOWN_LINK_COLOR){
+        line.setMap(map);
+        infoBox(map, line, content);
+    }
     return line;
 }
 
 function getLink(LatLng1, LatLng2){
     for (i=0; i<links.length; i++) {
-        link = links[i].pline;
+        var link = links[i].pline;
         var coord1 = "("+link.getPath().getAt(0).lat()+", "+link.getPath().getAt(0).lng()+")"
         var coord2 = "("+link.getPath().getAt(1).lat()+", "+link.getPath().getAt(1).lng()+")"
         if ( ((LatLng1.toString() == coord1) && (LatLng2.toString() == coord2)) ||
