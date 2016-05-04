@@ -234,7 +234,7 @@ class Server(threading.Thread):
         end_time = datetime.datetime.strptime(
                         utc_time,
                         '%Y-%m-%dT%H:%M:%S.%fZ'
-                    ) + datetime.timedelta(minutes=31)
+                    ) + datetime.timedelta(minutes=20)
         end_time = end_time.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
         # build InfluxDB query
@@ -245,6 +245,7 @@ class Server(threading.Thread):
             query = query + " AND site='" + site + "'"
         else:
             query = query + " WHERE site='" + site + "'"
+        query = query + "ORDER BY time DESC"
 
         # send query, parse the result and return the output in json
         influx_json = self.influxClient.query(query).raw
