@@ -211,7 +211,7 @@ function getLinkColor(rssi, pdr){
             return UNKNOWN_LINK_COLOR;
         if (pdr >= GOOD_LINK_PDR)
             return GOOD_LINK_COLOR;
-        else if (pdr > MEDIUM_LINK_COLOR && pdr < GOOD_LINK_COLOR)
+        else if (pdr > MEDIUM_LINK_PDR && pdr < GOOD_LINK_PDR)
             return MEDIUM_LINK_COLOR;
     }
 }
