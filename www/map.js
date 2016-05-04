@@ -274,8 +274,8 @@ function getLocationFromMac(mac){
             return motes[i].marker.position;
         }
     }
-    return null;
     console.log("MAC not found:" + mac)
+    return null;
 }
 
 /*Function that shows a window with the content or info
