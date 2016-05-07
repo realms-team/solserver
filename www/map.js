@@ -97,8 +97,8 @@ function create_links(data){
 
     // create links
     for (var i=0; i < data.length; i++) {
-        for (var j=0; j<data[i].value.neighbors.length; j++){
-            var neighbor = data[i].value.neighbors[j];
+        for (var n_id in data[i].value.neighbors){
+            var neighbor = data[i].value.neighbors[n_id]
             if (neighbor.neighborId in motes){
                 var crd1 = getLocationFromMac(data[i].mac);
                 var crd2 = getLocationFromId(neighbor.neighborId)
