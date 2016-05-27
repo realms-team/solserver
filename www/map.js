@@ -24,9 +24,10 @@ var DEFAULT_PDR         = 101 // init to impossible value
 function initMap() {
     map = new google.maps.Map(document.getElementById('map'), {
         center: {lat: -33.114974, lng: -68.481041},
-        zoom: 18
+        zoom: 4
     });
     map.setMapTypeId(google.maps.MapTypeId.SATELLITE);
+    zoomTo(map.getZoom());
 
     // set date
     $( "#datepicker" ).datepicker();
@@ -301,4 +302,13 @@ function infoBox(map, marker, content) {
         infoWindow.setContent(content);
         infoWindow.open(map, marker);
     });
+}
+
+function zoomTo(zoom_level){
+    if(zoom_level==18) return 0;
+    else {
+        zoom_level++;
+        map.setZoom(zoom_level);
+        setTimeout("zoomTo("+zoom_level+")", 500);
+    }
 }
