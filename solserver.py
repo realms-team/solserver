@@ -52,7 +52,6 @@ DEFAULT_BACKUPFILE           = 'solserver.backup'
 
 # config file
 
-DEFAULT_SOLSERVERTOKEN       = 'DEFAULT_SOLSERVERTOKEN'
 DEFAULT_SOLMANAGERTOKEN      = 'DEFAULT_SOLMANAGERTOKEN'
 DEFAULT_SOLSERVERCERT        = 'solserver.cert'
 DEFAULT_SOLSERVERPRIVKEY     = 'solserver.ppk'
@@ -106,7 +105,6 @@ class AppData(object):
             self.data = {
                 'stats' : {},
                 'config' : {
-                    'solservertoken':          DEFAULT_SOLSERVERTOKEN,
                     'solmanagertoken':         DEFAULT_SOLMANAGERTOKEN,
                 },
             }
@@ -159,8 +157,7 @@ class Server(threading.Thread):
         # local variables
         AppData()
         self.sol                  = Sol.Sol()
-        self.solservertoken       = DEFAULT_SOLSERVERTOKEN
-        self.solmanagertoken      = DEFAULT_SOLSERVERTOKEN
+        self.solmanagertoken      = DEFAULT_SOLMANAGERTOKEN
         self.influxClient         = influxdb.client.InfluxDBClient(
             host        = 'localhost',
             port        = '8086',
@@ -299,7 +296,7 @@ class Server(threading.Thread):
             AppData().incrStats(STAT_NUM_JSON_REQ)
 
             # authorize the client
-            self._authorizeClient()
+            authorized_site = self._authorizeClient()
 
             # abort if malformed JSON body
             if bottle.request.json is None:
@@ -331,7 +328,7 @@ class Server(threading.Thread):
                 sol_json          = self.sol.bin_to_json(sol_bin)
 
                 # convert json->influxdb
-                tags = self._get_tags(self._formatBuffer(sol_json["mac"]))
+                tags = self._get_tags(authorized_site, self._formatBuffer(sol_json["mac"]))
                 sol_influxdbl    += [self.sol.json_to_influxdb(sol_json,tags)]
 
             # write to database
@@ -353,7 +350,7 @@ class Server(threading.Thread):
     #=== misc
 
     @staticmethod
-    def _get_tags(mac):
+    def _get_tags(site_name, mac):
         """
         :param mac str: a dash-separeted mac address
         :return: the tags associated to the given mac address
@@ -362,10 +359,11 @@ class Server(threading.Thread):
         """
         return_tags = { "mac" : mac } # default tag is only mac
         for site in sites.SITES:
-            for key,tags in site["motes"].iteritems():
-                if mac == key:
-                    return_tags.update(tags)
-                    return_tags["site"] = site["name"]
+            if site["name"] == site_name:
+                for key,tags in site["motes"].iteritems():
+                    if mac == key:
+                        return_tags.update(tags)
+                        return_tags["site"] = site["name"]
         return return_tags
 
     @staticmethod
@@ -376,7 +374,15 @@ class Server(threading.Thread):
         return '-'.join(["%.2x"%i for i in buf])
 
     def _authorizeClient(self):
-        if bottle.request.headers.get('X-REALMS-Token')!=self.solservertoken:
+        token_match = False
+        rcv_token   = bottle.request.headers.get('X-REALMS-Token')
+        site_name   = None
+        for site in sites.SITES:
+            if rcv_token == site["token"]:
+                token_match = True
+                site_name = site["name"]
+
+        if not token_match:
             AppData().incrStats(STAT_NUM_JSON_UNAUTHORIZED)
             log.warn("Unauthorized - Invalid Token: %s",
                     bottle.request.headers.get('X-REALMS-Token'))
@@ -385,6 +391,8 @@ class Server(threading.Thread):
                 status = 401,
                 headers= {'Content-Type': 'application/json'},
             )
+        else:
+            return site_name
 
     def _exec_cmd(self,cmd):
         returnVal = None
@@ -462,8 +470,6 @@ if __name__ == '__main__':
             DEFAULT_SOLSERVER = cf_parser.get('solserver','host')
         if cf_parser.has_option('solserver','tcpport'):
             DEFAULT_TCPPORT = cf_parser.getint('solserver','tcpport')
-        if cf_parser.has_option('solserver','token'):
-            DEFAULT_SOLSERVERTOKEN = cf_parser.get('solserver','token')
         if cf_parser.has_option('solserver','certfile'):
             DEFAULT_SOLSERVERCERT = cf_parser.get('solserver','certfile')
         if cf_parser.has_option('solserver','privatekey'):
@@ -473,13 +479,11 @@ if __name__ == '__main__':
     log.debug("Configuration:\n" +\
             "\tSOL_SERVER_HOST: '%s'\n"             +\
             "\tDEFAULT_TCPPORT: %d\n"               +\
-            "\tDEFAULT_SOLSERVERTOKEN: '%s'\n"      +\
             "\tDEFAULT_SOLSERVERCERT:  '%s'\n"      +\
             "\tDEFAULT_SOLSERVERPRIVKEY: '%s'\n"    +\
             "\tDEFAULT_BACKUPFILE: '%s'\n"          ,
             DEFAULT_SOLSERVER,
             DEFAULT_TCPPORT,
-            DEFAULT_SOLSERVERTOKEN,
             DEFAULT_SOLSERVERCERT,
             DEFAULT_SOLSERVERPRIVKEY,
             DEFAULT_BACKUPFILE
