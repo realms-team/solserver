@@ -1,4 +1,5 @@
 *.pyc
+/sites.py
 /solserver.backup
 /solserver.config
 /solserver.cert

@@ -33,6 +33,7 @@ import OpenCli
 import Sol
 import SolVersion
 import solserver_version
+import sites
 
 #============================ logging =========================================
 
@@ -326,9 +327,12 @@ class Server(threading.Thread):
             sol_influxdbl = []
             for sol_bin in sol_binl:
 
-                # convert bin->json->influxdb
+                # convert bin->json
                 sol_json          = self.sol.bin_to_json(sol_bin)
-                sol_influxdbl    += [self.sol.json_to_influxdb(sol_json)]
+
+                # convert json->influxdb
+                tags = self._get_tags(self._formatBuffer(sol_json["mac"]))
+                sol_influxdbl    += [self.sol.json_to_influxdb(sol_json,tags)]
 
             # write to database
             try:
@@ -347,6 +351,29 @@ class Server(threading.Thread):
             raise
 
     #=== misc
+
+    @staticmethod
+    def _get_tags(mac):
+        """
+        :param mac str: a dash-separeted mac address
+        :return: the tags associated to the given mac address
+        :rtype: dict
+        Notes: tags are read from 'site.py' file
+        """
+        return_tags = { "mac" : mac } # default tag is only mac
+        for site in sites.SITES:
+            for key,tags in site["motes"].iteritems():
+                if mac == key:
+                    return_tags.update(tags)
+                    return_tags["site"] = site["name"]
+        return return_tags
+
+    @staticmethod
+    def _formatBuffer(buf):
+        '''
+        example: [0x11,0x22,0x33,0x44,0x55,0x66,0x77,0x88] -> "11-22-33-44-55-66-77-88"
+        '''
+        return '-'.join(["%.2x"%i for i in buf])
 
     def _authorizeClient(self):
         if bottle.request.headers.get('X-REALMS-Token')!=self.solservertoken:
