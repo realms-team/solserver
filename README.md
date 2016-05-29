@@ -18,6 +18,9 @@ This repo contains the software to run on the solserver. This server:
 * make sure InfluxDB is running on your computer
 * double-click/run on `solserver.py` to start the server
 
+* periodic database backup can be done using the following line (every hour)
+   * `0 * * * * /path/to/influxd backup -database realms /path/to/backup_dir/$(date +\%y.\%m.\%d-\%H)`
+
 # JSON API documentation
 
 The server offers a JSON API for managers to report data.

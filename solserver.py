@@ -21,18 +21,25 @@ import traceback
 import datetime
 from   optparse                 import OptionParser
 from   ConfigParser             import SafeConfigParser
+import logging
+import logging.config
 
 # third-party packages
 import bottle
 import influxdb
-import flatdict
 
 # project-specific
 import OpenCli
 import Sol
 import SolVersion
-import SolDefines
 import solserver_version
+import sites
+
+#============================ logging =========================================
+
+logging.config.fileConfig('logging.conf')
+log = logging.getLogger('solserver')
+log.setLevel(logging.DEBUG)
 
 #============================ defines =========================================
 
@@ -45,7 +52,6 @@ DEFAULT_BACKUPFILE           = 'solserver.backup'
 
 # config file
 
-DEFAULT_SOLSERVERTOKEN       = 'DEFAULT_SOLSERVERTOKEN'
 DEFAULT_SOLMANAGERTOKEN      = 'DEFAULT_SOLMANAGERTOKEN'
 DEFAULT_SOLSERVERCERT        = 'solserver.cert'
 DEFAULT_SOLSERVERPRIVKEY     = 'solserver.ppk'
@@ -62,7 +68,7 @@ STAT_NUM_OBJECTS_DB_FAIL     = 'STAT_NUM_OBJECTS_DB_FAIL'
 
 def logCrash(threadName,err):
     output  = []
-    output += ["==============================================================="]
+    output += ["============================================================="]
     output += [time.strftime("%m/%d/%Y %H:%M:%S UTC",time.gmtime())]
     output += [""]
     output += ["CRASH in Thread {0}!".format(threadName)]
@@ -76,8 +82,7 @@ def logCrash(threadName,err):
     # update stats
     AppData().incrStats(STAT_NUM_CRASHES)
     print output
-    with open(DEFAULT_CRASHLOG,'a') as f:
-        f.write(output)
+    log.critical(output)
 
 #============================ classes =========================================
 
@@ -100,7 +105,6 @@ class AppData(object):
             self.data = {
                 'stats' : {},
                 'config' : {
-                    'solservertoken':          DEFAULT_SOLSERVERTOKEN,
                     'solmanagertoken':         DEFAULT_SOLMANAGERTOKEN,
                 },
             }
@@ -139,40 +143,52 @@ class CherryPySSL(bottle.ServerAdapter):
         )
         try:
             server.start()
+            log.info("Server started")
         finally:
             server.stop()
 
 class Server(threading.Thread):
-    
+
     def __init__(self,tcpport):
-        
+
         # store params
         self.tcpport    = tcpport
-        
+
         # local variables
         AppData()
         self.sol                  = Sol.Sol()
-        self.solservertoken       = DEFAULT_SOLSERVERTOKEN
-        self.solmanagertoken      = DEFAULT_SOLSERVERTOKEN
+        self.solmanagertoken      = DEFAULT_SOLMANAGERTOKEN
         self.influxClient         = influxdb.client.InfluxDBClient(
             host        = 'localhost',
             port        = '8086',
             database    = 'realms'
         )
-        
+
         # initialize web server
         self.web        = bottle.Bottle()
-        self.web.route(path='/',                   method='GET', callback=self._cb_root_GET)
-        self.web.route(path='/api/v1/echo.json',   method='POST',callback=self._cb_echo_POST)
-        self.web.route(path='/api/v1/status.json', method='GET', callback=self._cb_status_GET)
-        self.web.route(path='/api/v1/o.json',      method='PUT', callback=self._cb_o_PUT)
-        
+        self.web.route(path=['/<filename>',"/"],
+                       method='GET',
+                       callback=self._cb_root_GET,
+                       name='static')
+        self.web.route(path=['/api/v1/jsonp/<site>/<sol_type>/time/<utc_time>'],
+                       method='GET',
+                       callback=self._cb_jsonp_GET)
+        self.web.route(path='/api/v1/echo.json',
+                       method='POST',
+                       callback=self._cb_echo_POST)
+        self.web.route(path='/api/v1/status.json',
+                       method='GET',
+                       callback=self._cb_status_GET)
+        self.web.route(path='/api/v1/o.json',
+                       method='PUT',
+                       callback=self._cb_o_PUT)
+
         # start the thread
         threading.Thread.__init__(self)
         self.name       = 'Server'
         self.daemon     = True
         self.start()
-    
+
     def run(self):
         try:
             self.web.run(
@@ -182,52 +198,78 @@ class Server(threading.Thread):
                 quiet  = True,
                 debug  = False,
             )
-        
+
         except bottle.BottleException:
             raise
 
         except Exception as err:
             logCrash(self.name,err)
-    
+
+        log.info("Web server started")
+
     #======================== public ==========================================
-    
+
     def close(self):
         # bottle thread is daemon, it will close when main thread closes
         pass
-    
+
     #======================== private =========================================
-    
+
     #=== JSON request handler
-    
-    def _cb_root_GET(self):
-        return 'It works!'
-    
+
+    def _cb_root_GET(self, filename="map.html"):
+        return bottle.static_file(filename, "www")
+
+    def _cb_jsonp_GET(self, site, sol_type, utc_time):
+        # clean inputs
+        clean = self._check_map_query(site)
+        clean = clean and self._check_map_query(sol_type)
+        clean = clean and self._check_map_query(utc_time)
+        if not clean :
+            return "Wrong parameters"
+
+        # build InfluxDB query
+        query = "SELECT * FROM " + sol_type
+        query = query + " WHERE site='" + site + "'"
+        if sol_type == "SOL_TYPE_DUST_NOTIF_HRNEIGHBORS":
+            query = query + " AND time < '" + utc_time + "'"
+            query = query + ' GROUP BY "mac" ORDER BY time DESC LIMIT 1'
+        else:
+            query = query + ' GROUP BY "mac" ORDER BY time DESC'
+
+        # send query, parse the result and return the output in json
+        influx_json = self.influxClient.query(query).raw
+        j = ""
+        if len(influx_json) > 0:
+            j = self.sol.influxdb_to_json(influx_json)
+        return json.dumps(j)
+
     def _cb_echo_POST(self):
         try:
             # update stats
             AppData().incrStats(STAT_NUM_JSON_REQ)
-            
+
             # authorize the client
             self._authorizeClient()
-            
+
             bottle.response.content_type = bottle.request.content_type
             return bottle.request.body.read()
-        
+
         except bottle.BottleException:
             raise
-           
+
         except Exception as err:
             logCrash(self.name,err)
             raise
-    
+
     def _cb_status_GET(self):
         try:
             # update stats
             AppData().incrStats(STAT_NUM_JSON_REQ)
-            
+
             # authorize the client
             self._authorizeClient()
-            
+
             returnVal = {
                 'version solserver': solserver_version.VERSION,
                 'version Sol': SolVersion.VERSION,
@@ -247,19 +289,21 @@ class Server(threading.Thread):
         except Exception as err:
             logCrash(self.name,err)
             raise
-    
+
     def _cb_o_PUT(self):
         try:
             # update stats
             AppData().incrStats(STAT_NUM_JSON_REQ)
-            
+
             # authorize the client
-            self._authorizeClient()
-            
+            authorized_site = self._authorizeClient()
+
             # abort if malformed JSON body
             if bottle.request.json is None:
                 raise bottle.HTTPResponse(
-                    body   = json.dumps({'error': 'Malformed JSON body'}),
+                    body   = json.dumps(
+                                {'error': 'Malformed JSON body'}
+                            ),
                     status = 400,
                     headers= {'Content-Type': 'application/json'},
                 )
@@ -269,7 +313,9 @@ class Server(threading.Thread):
                 sol_binl = self.sol.http_to_bin(bottle.request.json)
             except:
                 raise bottle.HTTPResponse(
-                    body   = json.dumps({'error': 'Malformed JSON body contents'}),
+                    body   = json.dumps(
+                                {'error': 'Malformed JSON body contents'}
+                            ),
                     status = 400,
                     headers= {'Content-Type': 'application/json'},
                 )
@@ -277,11 +323,14 @@ class Server(threading.Thread):
             # bin->json->influxdb format, then write to put database
             sol_influxdbl = []
             for sol_bin in sol_binl:
-                
-                # convert bin->json->influxdb
+
+                # convert bin->json
                 sol_json          = self.sol.bin_to_json(sol_bin)
-                sol_influxdbl    += [self.sol.json_to_influxdb(sol_json)]
-                
+
+                # convert json->influxdb
+                tags = self._get_tags(authorized_site, self._formatBuffer(sol_json["mac"]))
+                sol_influxdbl    += [self.sol.json_to_influxdb(sol_json,tags)]
+
             # write to database
             try:
                 self.influxClient.write_points(sol_influxdbl)
@@ -297,18 +346,54 @@ class Server(threading.Thread):
         except Exception as err:
             logCrash(self.name,err)
             raise
-    
+
     #=== misc
-    
+
+    @staticmethod
+    def _get_tags(site_name, mac):
+        """
+        :param mac str: a dash-separeted mac address
+        :return: the tags associated to the given mac address
+        :rtype: dict
+        Notes: tags are read from 'site.py' file
+        """
+        return_tags = { "mac" : mac } # default tag is only mac
+        for site in sites.SITES:
+            if site["name"] == site_name:
+                for key,tags in site["motes"].iteritems():
+                    if mac == key:
+                        return_tags.update(tags)
+                        return_tags["site"] = site["name"]
+        return return_tags
+
+    @staticmethod
+    def _formatBuffer(buf):
+        '''
+        example: [0x11,0x22,0x33,0x44,0x55,0x66,0x77,0x88] -> "11-22-33-44-55-66-77-88"
+        '''
+        return '-'.join(["%.2x"%i for i in buf])
+
     def _authorizeClient(self):
-        if bottle.request.headers.get('X-REALMS-Token')!=self.solservertoken:
+        token_match = False
+        rcv_token   = bottle.request.headers.get('X-REALMS-Token')
+        site_name   = None
+        for site in sites.SITES:
+            if rcv_token == site["token"]:
+                token_match = True
+                site_name = site["name"]
+
+        if not token_match:
             AppData().incrStats(STAT_NUM_JSON_UNAUTHORIZED)
+            log.warn("Unauthorized - Invalid Token: %s",
+                    bottle.request.headers.get('X-REALMS-Token'))
             raise bottle.HTTPResponse(
                 body   = json.dumps({'error': 'Unauthorized'}),
                 status = 401,
                 headers= {'Content-Type': 'application/json'},
             )
-    
+        else:
+            return site_name
+
     def _exec_cmd(self,cmd):
         returnVal = None
         try:
@@ -316,15 +401,26 @@ class Server(threading.Thread):
         except subprocess.CalledProcessError:
             returnVal = "ERROR"
         return returnVal
-    
+
+    def _check_map_query(self, query):
+        OK_CHARS = "abcdefghijklmnopqrstuvwxyz0123456789 _-.:%"
+        check = [x for x in query if x.lower() not in OK_CHARS] == []
+
+        # check for wrong keywords
+        WRONG_KEYWORDS = ["drop", "insert", "write"]
+        for word in WRONG_KEYWORDS:
+            if word in query.lower():
+                check = False
+
+        return check
+
 #============================ main ============================================
 
 solserver = None
 
 def quitCallback():
-    global solserver
-    
     solserver.close()
+    log.info("================================== Solserver stopped")
 
 def cli_cb_stats(params):
     stats = AppData().getStats()
@@ -336,12 +432,13 @@ def cli_cb_stats(params):
 
 def main(tcpport):
     global solserver
-    
+
     # create the server instance
     solserver = Server(
         tcpport
     )
-    
+    log.info("================================== Solserver started")
+
     # start the CLI interface
     cli = OpenCli.OpenCli(
         "Server",
@@ -362,7 +459,7 @@ def main(tcpport):
 if __name__ == '__main__':
     # parse the config file
     cf_parser = SafeConfigParser()
-    cf_parser.read(DEFAULT_CONFIGFILE) 
+    cf_parser.read(DEFAULT_CONFIGFILE)
 
     if cf_parser.has_section('solmanager'):
         if cf_parser.has_option('solmanager','token'):
@@ -373,26 +470,34 @@ if __name__ == '__main__':
             DEFAULT_SOLSERVER = cf_parser.get('solserver','host')
         if cf_parser.has_option('solserver','tcpport'):
             DEFAULT_TCPPORT = cf_parser.getint('solserver','tcpport')
-        if cf_parser.has_option('solserver','token'):
-            DEFAULT_SOLSERVERTOKEN = cf_parser.get('solserver','token')
         if cf_parser.has_option('solserver','certfile'):
             DEFAULT_SOLSERVERCERT = cf_parser.get('solserver','certfile')
         if cf_parser.has_option('solserver','privatekey'):
             DEFAULT_SOLSERVERPRIVKEY = cf_parser.get('solserver','privatekey')
-        if cf_parser.has_option('solserver','crashlogfile'):
-            DEFAULT_CRASHLOG = cf_parser.get('solserver','crashlogfile')
         if cf_parser.has_option('solserver','backupfile'):
             DEFAULT_BACKUPFILE = cf_parser.get('solserver','backupfile')
+    log.debug("Configuration:\n" +\
+            "\tSOL_SERVER_HOST: '%s'\n"             +\
+            "\tDEFAULT_TCPPORT: %d\n"               +\
+            "\tDEFAULT_SOLSERVERCERT:  '%s'\n"      +\
+            "\tDEFAULT_SOLSERVERPRIVKEY: '%s'\n"    +\
+            "\tDEFAULT_BACKUPFILE: '%s'\n"          ,
+            DEFAULT_SOLSERVER,
+            DEFAULT_TCPPORT,
+            DEFAULT_SOLSERVERCERT,
+            DEFAULT_SOLSERVERPRIVKEY,
+            DEFAULT_BACKUPFILE
+            )
 
     # parse the command line
     parser = OptionParser("usage: %prog [options]")
     parser.add_option(
-        "-t", "--tcpport", dest="tcpport", 
+        "-t", "--tcpport", dest="tcpport",
         default=DEFAULT_TCPPORT,
         help="TCP port to start the JSON API on."
     )
     (options, args) = parser.parse_args()
-    
+
     main(
         options.tcpport,
     )

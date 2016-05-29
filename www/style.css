@@ -1,0 +1,26 @@
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+#map {
+  display: inline-block;
+  height: 100%;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+}
+#control_panel{
+  position: absolute;
+  top:0;
+  right:0;
+  padding: 0;
+  margin: 0;
+  vertical-align: top;
+  text-align: right;
+}
+#links{
+    position: absolute;
+    top: 50px;
+    left: 0;
+}
