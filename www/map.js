@@ -124,24 +124,29 @@ function create_links(data){
 
                         link.pline.setMap(null);
                         var color   = getLinkColor(link.metric.rssi, link.metric.pdr);
+                        var dist    = calcDistance(lineCoords[0],lineCoords[1])
                         // set line parameters
                         if (link.metric.pdr == DEFAULT_PDR)
                           s_pdr = "No Tx"
                         else
                           s_pdr = link.metric.pdr + "%"
                         var content =   "RSSI: " + rssi + "dBm<br>" +
-                                        "PDR: " + s_pdr
+                                        "PDR: " + s_pdr + "<br>" +
+                                        "Distance: " + dist + "m"
                         link.pline  = createPolyline(lineCoords, content, color);
                     } // create link if it does not already exists
                     else {
                         var color   = getLinkColor(rssi, pdr);
+                        var dist    = calcDistance(lineCoords[0],lineCoords[1])
+                        // set line parameters
                         // set line parameters
                         if (pdr == DEFAULT_PDR)
                           s_pdr = "No Tx"
                         else
                           s_pdr = pdr + "%"
                         var content =   "RSSI: " + rssi + "dBm<br>" +
-                                        "PDR: " + s_pdr
+                                        "PDR: " + s_pdr + "<br>" +
+                                        "Distance: " + dist + "m"
                         var l = createPolyline(lineCoords, content, color);
                         var newLink = {
                             "pline" :   l,
@@ -289,6 +294,11 @@ function getLocationFromMac(mac){
     }
     console.log("MAC not found:" + mac)
     return null;
+}
+
+// calculates distance between two points in meters
+function calcDistance(p1, p2) {
+    return (google.maps.geometry.spherical.computeDistanceBetween(p1, p2)).toFixed(2);
 }
 
 /*Function that shows a window with the content or info
