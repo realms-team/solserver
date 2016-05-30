@@ -88,12 +88,13 @@ function create_motes(data){
 
 function create_links(data){
 
-    // update motes location
+    // update motes
     for (var i=0; i < data.length; i++) {
-        udpateMoteLocation(
+        udpateMote(
             data[i].mac,
             data[i].value.latitude,
-            data[i].value.longitude);
+            data[i].value.longitude,
+            data[i].value.board);
     }
 
     // create links
@@ -222,17 +223,20 @@ function getLinkColor(rssi, pdr){
     }
 }
 
-function udpateMoteLocation(mac, lat, lng){
+function udpateMote(mac, lat, lng, board){
     var moteId = null;
     for (var i=0; i<motes.length; i++) {
         if (i in motes){
             if (motes[i].mac == mac){
+                var content = mac + "<br>"
+                if (board != null)
+                  content += board + "<br>"
                 if (motes[i].marker == null){
-                    motes[i].marker = createMarker(lat, lng, mac);
+                    motes[i].marker = createMarker(lat, lng, content);
                 } else if (motes[i].marker.position.lat() != lat ||
                             motes[i].marker.position.lng() != lng) {
                     motes[i].marker.setMap(null);
-                    motes[i].marker = createMarker(lat, lng, mac);
+                    motes[i].marker = createMarker(lat, lng, content);
                 }
             }
         }
@@ -277,6 +281,13 @@ function getLink(LatLng1, LatLng2){
         }
     }
     return null
+}
+
+function getMoteFromId(moteId){
+    if (motes[moteId].marker != null)
+        return motes[moteId].marker.position;
+    else
+        return null;
 }
 
 function getLocationFromId(moteId){
