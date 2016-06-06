@@ -1,6 +1,5 @@
 // Global variables
 var timeout;
-var sites   = [] // a list of sites
 
 //------------------ Init functions ------------------------------------------//
 
@@ -23,19 +22,34 @@ function set_sites(data){
             '<div class="col-sm-3">' +
                 '<div class="panel panel-primary">' +
                     '<div class="panel-heading">' +
-                        '<h3 class="panel-title">' + data[i].value.site + '</h3>' +
+                        '<span class="col-xs-8 panel-title">' + data[i].value.site + "</span>" +
+                        '<button class="update_btn col-xs-4 btn btn-default btn-xs"'+
+                        'onclick=start_update(this,\''+data[i].value.site+'\');'+'title="Update">'+
+                            '<span class="glyphicon glyphicon-arrow-up" aria-hidden="true"></span>' +
+                        '</button>'+
+                        '<br>' +
                     '</div>' +
                     '<div class="panel-body">' +
                         '<b>sol_version:</b> ' + data[i].value.sol_version + '<br>' +
                         '<b>solmanager_version:</b> ' + data[i].value.solmanager_version + '<br>' +
                         '<b>sdk_version:</b> ' + data[i].value.sdk_version + '<br>' +
                     '</div>' +
+                    '<div class="text-right">' +
+                        '<small>' + data[i].timestamp + "</small>&nbsp;" +
+                    '</div>' +
                 '</div>' +
             '</div>'
             );
-        sites[i] = data
-        console.log(data[i].value.site + ":" + data[i].value.sol_version);
     }
+}
+
+// Tell the server to start the update process
+function start_update(self,site_name){
+    $.post("api/v1/setaction/update/site/"+site_name, _update_handler);
+    $("#feedback").append("> Update started for site "+site_name+"<br>");
+}
+
+function _update_handler(data){
 }
 
 //----------------Interface Listeners ---------------------------------------//

@@ -63,6 +63,7 @@ STAT_NUM_JSON_UNAUTHORIZED   = 'NUM_JSON_UNAUTHORIZED'
 STAT_NUM_CRASHES             = 'NUM_CRASHES'
 STAT_NUM_OBJECTS_DB_OK       = 'STAT_NUM_OBJECTS_DB_OK'
 STAT_NUM_OBJECTS_DB_FAIL     = 'STAT_NUM_OBJECTS_DB_FAIL'
+STAT_NUM_SET_ACTION_REQ      = 'NUM_SET_ACTION_REQ'
 
 #============================ helpers =========================================
 
@@ -163,6 +164,7 @@ class Server(threading.Thread):
             port        = '8086',
             database    = 'realms'
         )
+        self.actions    = []
 
         # initialize web server
         self.web        = bottle.Bottle()
@@ -173,6 +175,12 @@ class Server(threading.Thread):
         self.web.route(path=['/api/v1/jsonp/<site>/<sol_type>/time/<utc_time>'],
                        method='GET',
                        callback=self._cb_jsonp_GET)
+        self.web.route(path=['/api/v1/getactions/'],
+                       method='GET',
+                       callback=self._cb_getactions_GET)
+        self.web.route(path=['/api/v1/setaction/<action>/site/<site>'],
+                       method='POST',
+                       callback=self._cb_setaction_POST)
         self.web.route(path='/api/v1/echo.json',
                        method='POST',
                        callback=self._cb_echo_POST)
@@ -212,6 +220,21 @@ class Server(threading.Thread):
     def close(self):
         # bottle thread is daemon, it will close when main thread closes
         pass
+
+    def set_action(self, action):
+        action_exists = False
+        for item in self.actions:
+            if cmp(action, item) == 0:
+                action_exists = True
+        if not action_exists:
+            self.actions.append(action)
+
+    def get_actions(self, site):
+        actions = []
+        for item in self.actions:
+            if item["site"] == site:
+                actions.append(item)
+        return actions
 
     #======================== private =========================================
 
@@ -255,6 +278,66 @@ class Server(threading.Thread):
         if len(influx_json) > 0:
             j = self.sol.influxdb_to_json(influx_json)
         return json.dumps(j)
+
+    def _cb_getactions_GET(self):
+        """
+        Triggered when the solmanager requests the solserver for actions
+
+        Ex:
+           1. solmanager asks solserver for actions
+           2. solserver tells solmanager to update its SOL library
+        """
+
+        global solserver
+        try:
+            # update stats
+            AppData().incrStats(STAT_NUM_JSON_REQ)
+
+            # authorize the client
+            site = self._authorizeClient()
+
+            bottle.response.content_type = 'application/json'
+            return json.dumps(solserver.get_actions(site))
+
+        except bottle.BottleException:
+            raise
+
+        except Exception as err:
+            logCrash(self.name,err)
+            raise
+
+    def _cb_setaction_POST(self, action, site):
+        """
+        Add an action to passively give order to the solmanager.
+        When the solmanager can't be reached by the solserver, the solmanager
+        periodically ask the server for actions.
+        """
+
+        global solserver
+        try:
+            # update stats
+            AppData().incrStats(STAT_NUM_SET_ACTION_REQ)
+
+            # format action
+            action_json = {
+                "action":   action,
+                "site":     site,
+            }
+
+            # add action to list if action is available
+            available_actions = ["update"]
+            if action in available_actions:
+                solserver.set_action(action_json)
+
+            bottle.response.content_type = 'application/json'
+            return json.dumps("update started")
+
+        except bottle.BottleException:
+            raise
+
+        except Exception as err:
+            logCrash(self.name,err)
+            raise
 
     def _cb_echo_POST(self):
         try:
