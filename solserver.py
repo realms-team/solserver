@@ -235,10 +235,16 @@ class Server(threading.Thread):
 
         # build InfluxDB query
         query = "SELECT * FROM " + sol_type
-        query = query + " WHERE site='" + site + "'"
+        if site != "all":
+            query = query + " WHERE site = '" + site + "'"
+        else:
+            # select all sites
+            query = query + " WHERE site =~ //"
         if sol_type == "SOL_TYPE_DUST_NOTIF_HRNEIGHBORS":
             query = query + " AND time < '" + utc_time + "'"
             query = query + " AND time > '" + end_time + "'"
+            query = query + ' GROUP BY "mac" ORDER BY time DESC LIMIT 1'
+        elif sol_type == "SOL_TYPE_SOLMANAGER_STATS":
             query = query + ' GROUP BY "mac" ORDER BY time DESC LIMIT 1'
         else:
             query = query + ' GROUP BY "mac" ORDER BY time DESC'
