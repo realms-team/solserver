@@ -339,10 +339,13 @@ function calcDistance(p1, p2) {
 function infoBox(map, marker, content) {
     infoWindow = new google.maps.InfoWindow();
     // Attaching a click event to the current marker
-    google.maps.event.addListener(marker, "click", function(e) {
+    google.maps.event.addListener(marker, "mouseover", function(e) {
         infoWindow.setPosition(e.latLng);
         infoWindow.setContent(content);
         infoWindow.open(map, marker);
+        var iw_container = $(".gm-style-iw").parent();
+        iw_container.stop().hide();
+        iw_container.fadeIn(300);
     });
 }
 
