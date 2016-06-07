@@ -45,11 +45,18 @@ function set_sites(data){
 
 // Tell the server to start the update process
 function start_update(self,site_name){
-    $.post("api/v1/setaction/update/site/"+site_name, _update_handler);
-    $("#feedback").append("> Update started for site "+site_name+"<br>");
+    var token = prompt("Please give site token","");
+    var jqxhr = $.post("api/v1/setaction/update/site/"+site_name+"/token/"+token);
+    jqxhr.done(function() {
+        $("#feedback").append("> Update started for site "+site_name+"<br>");
+    })
+    jqxhr.fail(function(xhr, status) {
+        $("#feedback").append("> Error: "+xhr.responseText+"<br>");
+    })
 }
 
-function _update_handler(data){
+function _update_handler(data, status){
+    console.log("toto")
 }
 
 //----------------Interface Listeners ---------------------------------------//

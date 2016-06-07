@@ -178,7 +178,7 @@ class Server(threading.Thread):
         self.web.route(path=['/api/v1/getactions/'],
                        method='GET',
                        callback=self._cb_getactions_GET)
-        self.web.route(path=['/api/v1/setaction/<action>/site/<site>'],
+        self.web.route(path=['/api/v1/setaction/<action>/site/<site>/token/<token>'],
                        method='POST',
                        callback=self._cb_setaction_POST)
         self.web.route(path='/api/v1/echo.json',
@@ -306,7 +306,7 @@ class Server(threading.Thread):
             logCrash(self.name,err)
             raise
 
-    def _cb_setaction_POST(self, action, site):
+    def _cb_setaction_POST(self, action, site, token):
         """
         Add an action to passively give order to the solmanager.
         When the solmanager can't be reached by the solserver, the solmanager
@@ -317,6 +317,9 @@ class Server(threading.Thread):
         try:
             # update stats
             AppData().incrStats(STAT_NUM_SET_ACTION_REQ)
+
+            # authorize the client
+            site = self._authorizeClient(token)
 
             # format action
             action_json = {
@@ -330,7 +333,7 @@ class Server(threading.Thread):
                 solserver.set_action(action_json)
 
             bottle.response.content_type = 'application/json'
-            return json.dumps("update started")
+            return json.dumps("Action OK")
 
         except bottle.BottleException:
             raise
@@ -468,19 +471,21 @@ class Server(threading.Thread):
         '''
         return '-'.join(["%.2x"%i for i in buf])
 
-    def _authorizeClient(self):
+    def _authorizeClient(self, token=None, site_name=None):
         token_match = False
-        rcv_token   = bottle.request.headers.get('X-REALMS-Token')
-        site_name   = None
+        if token is None:
+            token   = bottle.request.headers.get('X-REALMS-Token')
+
         for site in sites.SITES:
-            if rcv_token == site["token"]:
+            if site_name is not None and site_name != site["name"]:
+                continue
+            if token == site["token"]:
                 token_match = True
                 site_name = site["name"]
 
         if not token_match:
             AppData().incrStats(STAT_NUM_JSON_UNAUTHORIZED)
-            log.warn("Unauthorized - Invalid Token: %s",
-                    bottle.request.headers.get('X-REALMS-Token'))
+            log.warn("Unauthorized - Invalid Token: %s",token)
             raise bottle.HTTPResponse(
                 body   = json.dumps({'error': 'Unauthorized'}),
                 status = 401,
