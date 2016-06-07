@@ -28,7 +28,6 @@ function initMap() {
         scaleControl: true,
     });
     map.setMapTypeId(google.maps.MapTypeId.SATELLITE);
-    zoomTo(map.getZoom());
 
     // set date
     $( "#datepicker" ).datepicker();
@@ -324,13 +323,4 @@ function infoBox(map, marker, content) {
         infoWindow.setContent(content);
         infoWindow.open(map, marker);
     });
-}
-
-function zoomTo(zoom_level){
-    if(zoom_level==18) return 0;
-    else {
-        zoom_level++;
-        map.setZoom(zoom_level);
-        setTimeout("zoomTo("+zoom_level+")", 500);
-    }
 }
