@@ -18,13 +18,15 @@ var timeout;
 var infoWindow;
 var SITE_TIME_OFFSET    = -3
 var DEFAULT_PDR         = 101 // init to impossible value
+var board_colors        = {"#c33c1c":null,"#dbd60d":null,"#acd2cd":null,"#ff9966":null}
+
 
 //------------------ Init functions ------------------------------------------//
 
 function initMap() {
     map = new google.maps.Map(document.getElementById('map'), {
         center: {lat: -33.114974, lng: -68.481041},
-        zoom: 4,
+        zoom: 18,
         scaleControl: true,
     });
     map.setMapTypeId(google.maps.MapTypeId.SATELLITE);
@@ -223,8 +225,25 @@ function getLinkColor(rssi, pdr){
     }
 }
 
+function getMoteColor(board){
+    if (board == null)
+        board = "unknown"
+    for (var color in board_colors){
+        if (board_colors[color] === null){
+            board_colors[color] = board;
+            return color;
+        }
+        else if (board_colors[color] === board){
+            return color
+        }
+    }
+    // return default color if board_color is too small
+    return "#FFF"
+}
+
 function udpateMote(mac, lat, lng, board){
-    var moteId = null;
+    var moteId  = null;
+    var color   = getMoteColor(board)
     for (var i=0; i<motes.length; i++) {
         if (i in motes){
             if (motes[i].mac == mac){
@@ -232,23 +251,24 @@ function udpateMote(mac, lat, lng, board){
                 if (board != null)
                   content += board + "<br>"
                 if (motes[i].marker == null){
-                    motes[i].marker = createMarker(lat, lng, content);
+                    motes[i].marker = createMarker(lat, lng, content, color);
                 } else if (motes[i].marker.position.lat() != lat ||
                             motes[i].marker.position.lng() != lng) {
                     motes[i].marker.setMap(null);
-                    motes[i].marker = createMarker(lat, lng, content);
+                    motes[i].marker = createMarker(lat, lng, content, color);
                 }
             }
         }
     }
 }
 
-function createMarker(lat, lng, content){
+function createMarker(lat, lng, content, color){
     // create Markers
     var myLatLng = new google.maps.LatLng(lat, lng)
     var marker = new google.maps.Marker({
         position: myLatLng,
         map: map,
+        icon: pinSymbol(color),
     });
     // add popup listener
     infoBox(map, marker, content);
@@ -323,4 +343,16 @@ function infoBox(map, marker, content) {
         infoWindow.setContent(content);
         infoWindow.open(map, marker);
     });
+}
+
+// Function that create a vectorial image of a marker with the given color
+function pinSymbol(color) {
+    return {
+        path: 'M 0,0 C -2,-20 -10,-22 -10,-30 A 10,10 0 1,1 10,-30 C 10,-22 2,-20 0,0 z M -2,-30 a 2,2 0 1,1 4,0 2,2 0 1,1 -4,0',
+        fillColor: color,
+        fillOpacity: 1,
+        strokeColor: '#000',
+        strokeWeight: 2,
+        scale: 1,
+   };
 }
