@@ -234,6 +234,7 @@ class Server(threading.Thread):
         for item in self.actions:
             if item["site"] == site:
                 actions.append(item)
+        self.actions = [] # removing previous actions
         return actions
 
     #======================== private =========================================
