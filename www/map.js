@@ -24,7 +24,8 @@ var DEFAULT_PDR         = 101 // init to impossible value
 function initMap() {
     map = new google.maps.Map(document.getElementById('map'), {
         center: {lat: -33.114974, lng: -68.481041},
-        zoom: 4
+        zoom: 4,
+        scaleControl: true,
     });
     map.setMapTypeId(google.maps.MapTypeId.SATELLITE);
     zoomTo(map.getZoom());
