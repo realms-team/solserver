@@ -5,7 +5,7 @@ token         = DEFAULT_SOLMANAGERTOKEN
 [solserver]
 # connection
 tcpport       = 8081
-host          = 0.0.0.0 #listen on all interfaces 
+host          = 0.0.0.0
 
 # security
 token         = DEFAULT_SOLSERVERTOKEN
