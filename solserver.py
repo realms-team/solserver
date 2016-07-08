@@ -63,6 +63,7 @@ STAT_NUM_JSON_UNAUTHORIZED   = 'NUM_JSON_UNAUTHORIZED'
 STAT_NUM_CRASHES             = 'NUM_CRASHES'
 STAT_NUM_OBJECTS_DB_OK       = 'STAT_NUM_OBJECTS_DB_OK'
 STAT_NUM_OBJECTS_DB_FAIL     = 'STAT_NUM_OBJECTS_DB_FAIL'
+STAT_NUM_SET_ACTION_REQ      = 'NUM_SET_ACTION_REQ'
 
 #============================ helpers =========================================
 
@@ -163,6 +164,7 @@ class Server(threading.Thread):
             port        = '8086',
             database    = 'realms'
         )
+        self.actions    = []
 
         # initialize web server
         self.web        = bottle.Bottle()
@@ -173,6 +175,12 @@ class Server(threading.Thread):
         self.web.route(path=['/api/v1/jsonp/<site>/<sol_type>/time/<utc_time>'],
                        method='GET',
                        callback=self._cb_jsonp_GET)
+        self.web.route(path=['/api/v1/getactions/'],
+                       method='GET',
+                       callback=self._cb_getactions_GET)
+        self.web.route(path=['/api/v1/setaction/<action>/site/<site>/token/<token>'],
+                       method='POST',
+                       callback=self._cb_setaction_POST)
         self.web.route(path='/api/v1/echo.json',
                        method='POST',
                        callback=self._cb_echo_POST)
@@ -213,6 +221,22 @@ class Server(threading.Thread):
         # bottle thread is daemon, it will close when main thread closes
         pass
 
+    def set_action(self, action):
+        action_exists = False
+        for item in self.actions:
+            if cmp(action, item) == 0:
+                action_exists = True
+        if not action_exists:
+            self.actions.append(action)
+
+    def get_actions(self, site):
+        actions = []
+        for item in self.actions:
+            if item["site"] == site:
+                actions.append(item)
+        self.actions = [] # removing previous actions
+        return actions
+
     #======================== private =========================================
 
     #=== JSON request handler
@@ -228,11 +252,23 @@ class Server(threading.Thread):
         if not clean :
             return "Wrong parameters"
 
+        # compute time + 30m
+        end_time = datetime.datetime.strptime(utc_time, '%Y-%m-%dT%H:%M:%S.%fZ') - \
+                    datetime.timedelta(minutes=16)
+        end_time = end_time.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+
         # build InfluxDB query
         query = "SELECT * FROM " + sol_type
-        query = query + " WHERE site='" + site + "'"
+        if site != "all":
+            query = query + " WHERE site = '" + site + "'"
+        else:
+            # select all sites
+            query = query + " WHERE site =~ //"
         if sol_type == "SOL_TYPE_DUST_NOTIF_HRNEIGHBORS":
             query = query + " AND time < '" + utc_time + "'"
+            query = query + " AND time > '" + end_time + "'"
+            query = query + ' GROUP BY "mac" ORDER BY time DESC LIMIT 1'
+        elif sol_type == "SOL_TYPE_SOLMANAGER_STATS":
             query = query + ' GROUP BY "mac" ORDER BY time DESC LIMIT 1'
         else:
             query = query + ' GROUP BY "mac" ORDER BY time DESC'
@@ -243,6 +279,69 @@ class Server(threading.Thread):
         if len(influx_json) > 0:
             j = self.sol.influxdb_to_json(influx_json)
         return json.dumps(j)
+
+    def _cb_getactions_GET(self):
+        """
+        Triggered when the solmanager requests the solserver for actions
+
+        Ex:
+           1. solmanager asks solserver for actions
+           2. solserver tells solmanager to update its SOL library
+        """
+
+        global solserver
+        try:
+            # update stats
+            AppData().incrStats(STAT_NUM_JSON_REQ)
+
+            # authorize the client
+            site = self._authorizeClient()
+
+            bottle.response.content_type = 'application/json'
+            return json.dumps(solserver.get_actions(site))
+
+        except bottle.BottleException:
+            raise
+
+        except Exception as err:
+            logCrash(self.name,err)
+            raise
+
+    def _cb_setaction_POST(self, action, site, token):
+        """
+        Add an action to passively give order to the solmanager.
+        When the solmanager can't be reached by the solserver, the solmanager
+        periodically ask the server for actions.
+        """
+
+        global solserver
+        try:
+            # update stats
+            AppData().incrStats(STAT_NUM_SET_ACTION_REQ)
+
+            # authorize the client
+            site = self._authorizeClient(token)
+
+            # format action
+            action_json = {
+                "action":   action,
+                "site":     site,
+            }
+
+            # add action to list if action is available
+            available_actions = ["update"]
+            if action in available_actions:
+                solserver.set_action(action_json)
+
+            bottle.response.content_type = 'application/json'
+            return json.dumps("Action OK")
+
+        except bottle.BottleException:
+            raise
+
+        except Exception as err:
+            logCrash(self.name,err)
+            raise
 
     def _cb_echo_POST(self):
         try:
@@ -373,19 +472,21 @@ class Server(threading.Thread):
         '''
         return '-'.join(["%.2x"%i for i in buf])
 
-    def _authorizeClient(self):
+    def _authorizeClient(self, token=None, site_name=None):
         token_match = False
-        rcv_token   = bottle.request.headers.get('X-REALMS-Token')
-        site_name   = None
+        if token is None:
+            token   = bottle.request.headers.get('X-REALMS-Token')
+
         for site in sites.SITES:
-            if rcv_token == site["token"]:
+            if site_name is not None and site_name != site["name"]:
+                continue
+            if token == site["token"]:
                 token_match = True
                 site_name = site["name"]
 
         if not token_match:
             AppData().incrStats(STAT_NUM_JSON_UNAUTHORIZED)
-            log.warn("Unauthorized - Invalid Token: %s",
-                    bottle.request.headers.get('X-REALMS-Token'))
+            log.warn("Unauthorized - Invalid Token: %s",token)
             raise bottle.HTTPResponse(
                 body   = json.dumps({'error': 'Unauthorized'}),
                 status = 401,
