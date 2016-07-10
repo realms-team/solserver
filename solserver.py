@@ -30,8 +30,7 @@ import influxdb
 
 # project-specific
 import OpenCli
-import Sol
-import SolVersion
+from solobjectlib import Sol, SolVersion
 import solserver_version
 import sites
 
