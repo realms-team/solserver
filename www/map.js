@@ -37,7 +37,7 @@ function initMap() {
 
     // set time
     defaultDate = new Date();
-    defaultDate.setTime(defaultDate.getTime() + defaultDate.getTimezoneOffset()*60*1000);
+    defaultDate.setTime(defaultDate.getTime());
     $('#timepicker').timepicker({
         showNowButton: true,
         showDeselectButton: true,
