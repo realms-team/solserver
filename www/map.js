@@ -59,16 +59,24 @@ function load_data(loop){
     date.setHours(parseInt(time[0]) - localOffset, time[1]);
     isoTime = date.toISOString();
 
+    // get host and site name
+    var host        = window.location.origin
+    var sitename    = $("#sitename").val()
+
     // MOTE CREATE
     var solType     = "SOL_TYPE_DUST_SNAPSHOT";
     var encType     = encodeURIComponent(solType);
     var encTime     = encodeURIComponent(isoTime);
-    $.getJSON("api/v1/jsonp/ARG_junin/" + encType + "/time/" + encTime, create_motes);
+    $.getJSON(host+
+        "/api/v1/jsonp/"+sitename+"/" + encType +
+        "/time/" + encTime, create_motes);
 
     // LINKS CREATE
     solType         = "SOL_TYPE_DUST_NOTIF_HRNEIGHBORS";
     encType         = encodeURIComponent(solType);
-    $.getJSON("api/v1/jsonp/ARG_junin/" + encType + "/time/" + encTime, create_links);
+    $.getJSON(host+
+        "/api/v1/jsonp/"+sitename+"/" + encType +
+        "/time/" + encTime, create_links);
 
     if (loop == 1)
         timeout = setTimeout(load_data, 30000);

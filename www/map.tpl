@@ -25,6 +25,7 @@
       <button id="metric_rssi" onclick="$('#metric').val('rssi'); load_data();">RSSI</button>
       <button id="metric_pdr" onclick="$('#metric').val('pdr'); load_data();">PDR</button>
       <input type="hidden" id="metric" value="pdr">
+      <input type="hidden" id="sitename" value={{sitename}}>
     </div>
     <div id="links">
       <a href="https://sol.paris.inria.fr/" target="_blank"><img src="grafana.png"></a>

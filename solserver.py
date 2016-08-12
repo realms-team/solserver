@@ -167,9 +167,13 @@ class Server(threading.Thread):
 
         # initialize web server
         self.web        = bottle.Bottle()
-        self.web.route(path=['/<filename>',"/"],
+        self.web.route(path=["/"],
                        method='GET',
                        callback=self._cb_root_GET,
+                       name='static')
+        self.web.route(path=['/map/<sitename>/<filename>', '/map/<sitename>/'],
+                       method='GET',
+                       callback=self._cb_map_GET,
                        name='static')
         self.web.route(path=['/api/v1/jsonp/<site>/<sol_type>/time/<utc_time>'],
                        method='GET',
@@ -240,8 +244,14 @@ class Server(threading.Thread):
 
     #=== JSON request handler
 
-    def _cb_root_GET(self, filename="map.html"):
+    def _cb_root_GET(self):
         return bottle.static_file(filename, "www")
+
+    def _cb_map_GET(self, sitename, filename=""):
+        if filename == "":
+            return bottle.template("www/map", sitename=sitename)
+        else:
+            return bottle.static_file(filename, "www")
 
     def _cb_jsonp_GET(self, site, sol_type, utc_time):
         # clean inputs
