@@ -251,9 +251,9 @@ class Server(threading.Thread):
         if not clean :
             return "Wrong parameters"
 
-        # compute time + 30m
+        # compute time + 1h
         end_time = datetime.datetime.strptime(utc_time, '%Y-%m-%dT%H:%M:%S.%fZ') - \
-                    datetime.timedelta(minutes=16)
+                    datetime.timedelta(minutes=61)
         end_time = end_time.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
         # build InfluxDB query
@@ -264,6 +264,10 @@ class Server(threading.Thread):
             # select all sites
             query = query + " WHERE site =~ //"
         if sol_type == "SOL_TYPE_DUST_NOTIF_HRNEIGHBORS":
+            query = query + " AND time < '" + utc_time + "'"
+            query = query + " AND time > '" + end_time + "'"
+            query = query + ' GROUP BY "mac" ORDER BY time DESC LIMIT 1'
+        elif sol_type == "SOL_TYPE_DUST_SNAPSHOT":
             query = query + " AND time < '" + utc_time + "'"
             query = query + " AND time > '" + end_time + "'"
             query = query + ' GROUP BY "mac" ORDER BY time DESC LIMIT 1'

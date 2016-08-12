@@ -60,7 +60,7 @@ function load_data(loop){
     isoTime = date.toISOString();
 
     // MOTE CREATE
-    var solType     = "SOL_TYPE_DUST_EVENTMOTECREATE";
+    var solType     = "SOL_TYPE_DUST_SNAPSHOT";
     var encType     = encodeURIComponent(solType);
     var encTime     = encodeURIComponent(isoTime);
     $.getJSON("api/v1/jsonp/ARG_junin/" + encType + "/time/" + encTime, create_motes);
@@ -80,10 +80,11 @@ function load_data(loop){
 
 // populate the motes list
 function create_motes(data){
-    for (var i=0; i < data.length; i++) {
+    mote_list = data[0].value.mote
+    for (var i=0; i < Object.keys(mote_list).length; i++) {
         // populate table
-        motes[data[i].value.moteId] = {
-            "mac"       : data[i].value.macAddress,
+        motes[mote_list[i].moteId] = {
+            "mac"       : mote_list[i].macAddress,
             "marker"    : null
         }
     }
