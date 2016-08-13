@@ -25,7 +25,7 @@ var board_colors        = {"#c33c1c":null,"#dbd60d":null,"#acd2cd":null,"#ff9966
 
 function initMap() {
     map = new google.maps.Map(document.getElementById('map'), {
-        center: {lat: -33.114974, lng: -68.481041},
+        center: new google.maps.LatLng(0, 0),
         zoom: 18,
         scaleControl: true,
     });
@@ -89,26 +89,38 @@ function load_data(loop){
 
 // populate the motes list
 function create_motes(data){
-    mote_list = data[0].value.mote
-    for (var i=0; i < Object.keys(mote_list).length; i++) {
-        // populate table
-        motes[mote_list[i].moteId] = {
-            "mac"       : mote_list[i].macAddress,
-            "marker"    : null
+    if (Object.keys(data).length > 0) {
+
+        mote_list = data[0].value.mote
+        for (var i=0; i < Object.keys(mote_list).length; i++) {
+            // populate table
+            motes[mote_list[i].moteId] = {
+                "mac"       : mote_list[i].macAddress,
+                "marker"    : null
+            }
         }
     }
 }
 
 function create_links(data){
+    var bounds = new google.maps.LatLngBounds();
+    var loc;
 
-    // update motes
+    // update motes location and board type
     for (var i=0; i < data.length; i++) {
+        loc = new google.maps.LatLng(
+            data[i].value.latitude,
+            data[i].value.longitude
+        );
+        bounds.extend(loc);
         udpateMote(
             data[i].mac,
             data[i].value.latitude,
             data[i].value.longitude,
             data[i].value.board);
     }
+    map.fitBounds(bounds);
+    map.panToBounds(bounds);
 
     // create links
     for (var i=0; i < data.length; i++) {
