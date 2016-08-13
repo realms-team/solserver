@@ -57,27 +57,18 @@ function load_data(loop){
     var time        = $("#timepicker").timepicker('getTime').split(':');
     var localOffset = new Date().getTimezoneOffset()/60;
     date.setHours(parseInt(time[0]) - localOffset, time[1]);
-    isoTime = date.toISOString();
+    var isoTime = date.toISOString();
+    var encTime     = encodeURIComponent(isoTime);
 
     // get host and site name
     var host        = window.location.origin
-    var sitename    = $("#sitename").val()
     var path        = window.location.pathname.split("/map")[0]
+    var sitename    = $("#sitename").val()
 
-    // MOTE CREATE
-    var solType     = "SOL_TYPE_DUST_SNAPSHOT";
-    var encType     = encodeURIComponent(solType);
-    var encTime     = encodeURIComponent(isoTime);
-    $.getJSON(host+ path +
-        "/api/v1/jsonp/"+sitename+"/" + encType +
-        "/time/" + encTime, create_motes);
-
-    // LINKS CREATE
-    solType         = "SOL_TYPE_DUST_NOTIF_HRNEIGHBORS";
-    encType         = encodeURIComponent(solType);
-    $.getJSON(host+ path +
-        "/api/v1/jsonp/"+sitename+"/" + encType +
-        "/time/" + encTime, create_links);
+    // display motes and links
+    get_motes(host, path, sitename, encTime);
+    var delay = function() { get_links(host, path, sitename, encTime) };
+    window.setTimeout(delay,500);
 
     if (loop == 1)
         timeout = setTimeout(load_data, 30000);
@@ -86,6 +77,24 @@ function load_data(loop){
 }
 
 //------------------ Main functions ------------------------------------------//
+
+// request the server for mote information
+function get_motes(host, path, sitename, encTime){
+    var solType     = "SOL_TYPE_DUST_SNAPSHOT";
+    var encType     = encodeURIComponent(solType);
+    $.getJSON(host+ path +
+        "/api/v1/jsonp/"+sitename+"/" + encType +
+        "/time/" + encTime, create_motes);
+}
+
+// request the server for links information
+function get_links(host, path, sitename, encTime){
+    var solType     = "SOL_TYPE_DUST_NOTIF_HRNEIGHBORS";
+    var encType     = encodeURIComponent(solType);
+    $.getJSON(host+ path +
+        "/api/v1/jsonp/"+sitename+"/" + encType +
+        "/time/" + encTime, create_links);
+}
 
 // populate the motes list
 function create_motes(data){
