@@ -167,7 +167,7 @@ class Server(threading.Thread):
 
         # initialize web server
         self.web        = bottle.Bottle()
-        self.web.route(path=["/"],
+        self.web.route(path=["/<filename>"],
                        method='GET',
                        callback=self._cb_root_GET,
                        name='static')
@@ -244,7 +244,7 @@ class Server(threading.Thread):
 
     #=== JSON request handler
 
-    def _cb_root_GET(self):
+    def _cb_root_GET(self, filename="index.html"):
         return bottle.static_file(filename, "www")
 
     def _cb_map_GET(self, sitename, filename=""):
