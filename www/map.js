@@ -62,19 +62,20 @@ function load_data(loop){
     // get host and site name
     var host        = window.location.origin
     var sitename    = $("#sitename").val()
+    var path        = window.location.pathname.split("/map")[0]
 
     // MOTE CREATE
     var solType     = "SOL_TYPE_DUST_SNAPSHOT";
     var encType     = encodeURIComponent(solType);
     var encTime     = encodeURIComponent(isoTime);
-    $.getJSON(host+
+    $.getJSON(host+ path +
         "/api/v1/jsonp/"+sitename+"/" + encType +
         "/time/" + encTime, create_motes);
 
     // LINKS CREATE
     solType         = "SOL_TYPE_DUST_NOTIF_HRNEIGHBORS";
     encType         = encodeURIComponent(solType);
-    $.getJSON(host+
+    $.getJSON(host+ path +
         "/api/v1/jsonp/"+sitename+"/" + encType +
         "/time/" + encTime, create_links);
 
