@@ -52,13 +52,11 @@ function initMap() {
 function load_data(loop){
     clearLinks();
 
-    // set default time to current time minux 5 mins
+    // set default time to UTC time
     var date        = $("#datepicker").datepicker('getDate');
     var time        = $("#timepicker").timepicker('getTime').split(':');
     var localOffset = new Date().getTimezoneOffset()/60;
-    date.setHours(parseInt(time[0]) - localOffset, time[1]);
-    var isoTime = date.toISOString();
-    var encTime     = encodeURIComponent(isoTime);
+    date.setHours(parseInt(time[0]), time[1]);
 
     // get host and site name
     var host        = window.location.origin
@@ -66,8 +64,8 @@ function load_data(loop){
     var sitename    = $("#sitename").val()
 
     // display motes and links
-    get_motes(host, path, sitename, encTime);
-    var delay = function() { get_links(host, path, sitename, encTime) };
+    get_motes(host, path, sitename, date);
+    var delay = function() { get_links(host, path, sitename, date) };
     window.setTimeout(delay,500);
 
     if (loop == 1)
@@ -79,18 +77,22 @@ function load_data(loop){
 //------------------ Main functions ------------------------------------------//
 
 // request the server for mote information
-function get_motes(host, path, sitename, encTime){
+function get_motes(host, path, sitename, date){
     var solType     = "SOL_TYPE_DUST_SNAPSHOT";
     var encType     = encodeURIComponent(solType);
+    var isoTime     = date.toISOString();
+    var encTime     = encodeURIComponent(isoTime);
     $.getJSON(host+ path +
         "/api/v1/jsonp/"+sitename+"/" + encType +
         "/time/" + encTime, create_motes);
 }
 
 // request the server for links information
-function get_links(host, path, sitename, encTime){
+function get_links(host, path, sitename, date){
     var solType     = "SOL_TYPE_DUST_NOTIF_HRNEIGHBORS";
     var encType     = encodeURIComponent(solType);
+    var isoTime     = date.toISOString();
+    var encTime     = encodeURIComponent(isoTime);
     $.getJSON(host+ path +
         "/api/v1/jsonp/"+sitename+"/" + encType +
         "/time/" + encTime, create_links);
