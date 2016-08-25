@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>SaveThePeaches Map INTA</title>
+    <title>{{sitename}}</title>
     <meta name="viewport" content="initial-scale=1.0">
     <meta charset="utf-8">
     <link rel="stylesheet" type="text/css" href="style.css" />
@@ -19,12 +19,13 @@
       <input type="text" id="datepicker"><br>
       <input type="text" id="timepicker"><br>
       <button id="prev_time"><<</button>
-      <button id="dateselect" onclick="load_data(0)">PEACH</button>
+      <button id="dateselect" onclick="load_data(0)">Load</button>
       <button id="next_time">>></button>
       <br><br>
       <button id="metric_rssi" onclick="$('#metric').val('rssi'); load_data();">RSSI</button>
       <button id="metric_pdr" onclick="$('#metric').val('pdr'); load_data();">PDR</button>
       <input type="hidden" id="metric" value="pdr">
+      <input type="hidden" id="sitename" value={{sitename}}>
     </div>
     <div id="links">
       <a href="https://sol.paris.inria.fr/" target="_blank"><img src="grafana.png"></a>

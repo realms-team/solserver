@@ -25,7 +25,7 @@ var board_colors        = {"#c33c1c":null,"#dbd60d":null,"#acd2cd":null,"#ff9966
 
 function initMap() {
     map = new google.maps.Map(document.getElementById('map'), {
-        center: {lat: -33.114974, lng: -68.481041},
+        center: new google.maps.LatLng(0, 0),
         zoom: 18,
         scaleControl: true,
     });
@@ -37,7 +37,7 @@ function initMap() {
 
     // set time
     defaultDate = new Date();
-    defaultDate.setTime(defaultDate.getTime() + defaultDate.getTimezoneOffset()*60*1000);
+    defaultDate.setTime(defaultDate.getTime());
     $('#timepicker').timepicker({
         showNowButton: true,
         showDeselectButton: true,
@@ -52,23 +52,21 @@ function initMap() {
 function load_data(loop){
     clearLinks();
 
-    // set default time to current time minux 5 mins
+    // set default time to UTC time
     var date        = $("#datepicker").datepicker('getDate');
     var time        = $("#timepicker").timepicker('getTime').split(':');
     var localOffset = new Date().getTimezoneOffset()/60;
-    date.setHours(parseInt(time[0]) - localOffset, time[1]);
-    isoTime = date.toISOString();
+    date.setHours(parseInt(time[0]), time[1]);
 
-    // MOTE CREATE
-    var solType     = "SOL_TYPE_DUST_EVENTMOTECREATE";
-    var encType     = encodeURIComponent(solType);
-    var encTime     = encodeURIComponent(isoTime);
-    $.getJSON("api/v1/jsonp/ARG_junin/" + encType + "/time/" + encTime, create_motes);
+    // get host and site name
+    var host        = window.location.origin
+    var path        = window.location.pathname.split("/map")[0]
+    var sitename    = $("#sitename").val()
 
-    // LINKS CREATE
-    solType         = "SOL_TYPE_DUST_NOTIF_HRNEIGHBORS";
-    encType         = encodeURIComponent(solType);
-    $.getJSON("api/v1/jsonp/ARG_junin/" + encType + "/time/" + encTime, create_links);
+    // display motes and links
+    get_motes(host, path, sitename, date);
+    var delay = function() { get_links(host, path, sitename, date) };
+    window.setTimeout(delay,500);
 
     if (loop == 1)
         timeout = setTimeout(load_data, 30000);
@@ -78,27 +76,62 @@ function load_data(loop){
 
 //------------------ Main functions ------------------------------------------//
 
+// request the server for mote information
+function get_motes(host, path, sitename, date){
+    var solType     = "SOL_TYPE_DUST_SNAPSHOT";
+    var encType     = encodeURIComponent(solType);
+    var isoTime     = date.toISOString();
+    var encTime     = encodeURIComponent(isoTime);
+    $.getJSON(host+ path +
+        "/api/v1/jsonp/"+sitename+"/" + encType +
+        "/time/" + encTime, create_motes);
+}
+
+// request the server for links information
+function get_links(host, path, sitename, date){
+    var solType     = "SOL_TYPE_DUST_NOTIF_HRNEIGHBORS";
+    var encType     = encodeURIComponent(solType);
+    var isoTime     = date.toISOString();
+    var encTime     = encodeURIComponent(isoTime);
+    $.getJSON(host+ path +
+        "/api/v1/jsonp/"+sitename+"/" + encType +
+        "/time/" + encTime, create_links);
+}
+
 // populate the motes list
 function create_motes(data){
-    for (var i=0; i < data.length; i++) {
-        // populate table
-        motes[data[i].value.moteId] = {
-            "mac"       : data[i].value.macAddress,
-            "marker"    : null
+    if (Object.keys(data).length > 0) {
+
+        mote_list = data[0].value.mote
+        for (var i=0; i < Object.keys(mote_list).length; i++) {
+            // populate table
+            motes[mote_list[i].moteId] = {
+                "mac"       : mote_list[i].macAddress,
+                "marker"    : null
+            }
         }
     }
 }
 
 function create_links(data){
+    var bounds = new google.maps.LatLngBounds();
+    var loc;
 
-    // update motes
+    // update motes location and board type
     for (var i=0; i < data.length; i++) {
+        loc = new google.maps.LatLng(
+            data[i].value.latitude,
+            data[i].value.longitude
+        );
+        bounds.extend(loc);
         udpateMote(
             data[i].mac,
             data[i].value.latitude,
             data[i].value.longitude,
             data[i].value.board);
     }
+    map.fitBounds(bounds);
+    map.panToBounds(bounds);
 
     // create links
     for (var i=0; i < data.length; i++) {

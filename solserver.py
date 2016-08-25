@@ -30,8 +30,7 @@ import influxdb
 
 # project-specific
 import OpenCli
-import Sol
-import SolVersion
+from solobjectlib import Sol, SolVersion
 import solserver_version
 import sites
 
@@ -168,9 +167,13 @@ class Server(threading.Thread):
 
         # initialize web server
         self.web        = bottle.Bottle()
-        self.web.route(path=['/<filename>',"/"],
+        self.web.route(path=["/<filename>"],
                        method='GET',
                        callback=self._cb_root_GET,
+                       name='static')
+        self.web.route(path=['/map/<sitename>/<filename>', '/map/<sitename>/'],
+                       method='GET',
+                       callback=self._cb_map_GET,
                        name='static')
         self.web.route(path=['/api/v1/jsonp/<site>/<sol_type>/time/<utc_time>'],
                        method='GET',
@@ -241,8 +244,14 @@ class Server(threading.Thread):
 
     #=== JSON request handler
 
-    def _cb_root_GET(self, filename="map.html"):
+    def _cb_root_GET(self, filename="index.html"):
         return bottle.static_file(filename, "www")
+
+    def _cb_map_GET(self, sitename, filename=""):
+        if filename == "":
+            return bottle.template("www/map", sitename=sitename)
+        else:
+            return bottle.static_file(filename, "www")
 
     def _cb_jsonp_GET(self, site, sol_type, utc_time):
         # clean inputs
@@ -252,11 +261,6 @@ class Server(threading.Thread):
         if not clean :
             return "Wrong parameters"
 
-        # compute time + 30m
-        end_time = datetime.datetime.strptime(utc_time, '%Y-%m-%dT%H:%M:%S.%fZ') - \
-                    datetime.timedelta(minutes=16)
-        end_time = end_time.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-
         # build InfluxDB query
         query = "SELECT * FROM " + sol_type
         if site != "all":
@@ -265,8 +269,22 @@ class Server(threading.Thread):
             # select all sites
             query = query + " WHERE site =~ //"
         if sol_type == "SOL_TYPE_DUST_NOTIF_HRNEIGHBORS":
+            # compute time - 16min
+            start_time = datetime.datetime.strptime(
+                        utc_time, '%Y-%m-%dT%H:%M:%S.%fZ') - \
+                        datetime.timedelta(minutes=16)
+            start_time = start_time.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
             query = query + " AND time < '" + utc_time + "'"
-            query = query + " AND time > '" + end_time + "'"
+            query = query + " AND time > '" + start_time + "'"
+            query = query + ' GROUP BY "mac" ORDER BY time DESC LIMIT 1'
+        elif sol_type == "SOL_TYPE_DUST_SNAPSHOT":
+            # compute time - 16min
+            start_time = datetime.datetime.strptime(
+                        utc_time, '%Y-%m-%dT%H:%M:%S.%fZ') - \
+                        datetime.timedelta(minutes=61)
+            start_time = start_time.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+            query = query + " AND time < '" + utc_time + "'"
+            query = query + " AND time > '" + start_time + "'"
             query = query + ' GROUP BY "mac" ORDER BY time DESC LIMIT 1'
         elif sol_type == "SOL_TYPE_SOLMANAGER_STATS":
             query = query + ' GROUP BY "mac" ORDER BY time DESC LIMIT 1'
