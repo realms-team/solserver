@@ -104,7 +104,7 @@ function create_motes(data){
 
         // manager
         motes[0] = {
-            "mac"       : data[0].value.macAddress,
+            "mac"       : data[0].mac,
             "marker"    : null,
         }
 
