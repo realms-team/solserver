@@ -102,6 +102,13 @@ function get_links(host, path, sitename, date){
 function create_motes(data){
     if (Object.keys(data).length > 0) {
 
+        // manager
+        motes[0] = {
+            "mac"       : data[0].value.macAddress,
+            "marker"    : null,
+        }
+
+        // motes
         mote_list = data[0].value.mote
         for (var i=0; i < Object.keys(mote_list).length; i++) {
             // populate table
