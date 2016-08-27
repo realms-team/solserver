@@ -103,7 +103,7 @@ function create_motes(data){
     if (Object.keys(data).length > 0) {
 
         // manager
-        motes[0] = {
+        motes[1] = {
             "mac"       : data[0].mac,
             "marker"    : null,
         }
