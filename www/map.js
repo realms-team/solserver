@@ -141,7 +141,7 @@ function create_links(data){
             data[i].value.longitude
         );
         bounds.extend(loc);
-        udpateMote(
+        updateMote(
             data[i].mac,
             data[i].value.latitude,
             data[i].value.longitude,
@@ -292,7 +292,7 @@ function getMoteColor(board){
     return "#FFF"
 }
 
-function udpateMote(mac, lat, lng, board){
+function updateMote(mac, lat, lng, board){
     var moteId  = null;
     var color   = getMoteColor(board)
     for (var i=0; i<motes.length; i++) {
