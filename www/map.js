@@ -102,20 +102,6 @@ function get_links(host, path, sitename, date){
 function create_motes(data){
     if (Object.keys(data).length > 0) {
 
-        // manager
-        var color   = getMoteColor(data[0].board);
-        var mark = createMarker(
-            data[0].latitude,
-            data[0].longitude,
-            "Manager<br>"+data[0].mac+"<br>"+data[0].board,
-            color
-            );
-
-        motes[1] = {
-            "mac"       : data[0].mac,
-            "marker"    : mark,
-        }
-
         // motes
         mote_list = data[0].value.mote
         for (var i=0; i < Object.keys(mote_list).length; i++) {
@@ -125,6 +111,15 @@ function create_motes(data){
                 "marker"    : null
             }
         }
+
+        // manager
+        var color   = getMoteColor(data[0].value.board);
+        motes[1].marker = createMarker(
+            data[0].value.latitude,
+            data[0].value.longitude,
+            "Manager<br>"+data[0].mac+"<br>"+data[0].value.board,
+            color
+        );
     }
 }
 
