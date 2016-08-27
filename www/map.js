@@ -127,11 +127,15 @@ function create_links(data){
     // update motes location and board type
 
     //-- manager
-    updateMote(
+    var color   = getMoteColor(data[0].board)
         data[0].mac,
         data[0].latitude,
         data[0].longitude,
-        data[0].board
+    motes[1].marker = createMarker(
+        data[0].lat,
+        data[0].lng,
+        "Manager<br>"+data[0].mac+"<br>"+data[0].board,
+        color
         );
 
     //-- motes
