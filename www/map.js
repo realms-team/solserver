@@ -129,8 +129,8 @@ function create_links(data){
     //-- manager
     var color   = getMoteColor(data[0].board);
     motes[1].marker = createMarker(
-        data[0].lat,
-        data[0].lng,
+        data[0].latitude,
+        data[0].longitude,
         "Manager<br>"+data[0].mac+"<br>"+data[0].board,
         color
         );
