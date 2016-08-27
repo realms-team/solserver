@@ -125,6 +125,16 @@ function create_links(data){
     var loc;
 
     // update motes location and board type
+
+    //-- manager
+    updateMote(
+        data[0].mac,
+        data[0].latitude,
+        data[0].longitude,
+        data[0].board
+        );
+
+    //-- motes
     for (var i=0; i < data.length; i++) {
         loc = new google.maps.LatLng(
             data[i].value.latitude,
