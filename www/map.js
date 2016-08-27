@@ -103,9 +103,17 @@ function create_motes(data){
     if (Object.keys(data).length > 0) {
 
         // manager
+        var color   = getMoteColor(data[0].board);
+        var mark = createMarker(
+            data[0].latitude,
+            data[0].longitude,
+            "Manager<br>"+data[0].mac+"<br>"+data[0].board,
+            color
+            );
+
         motes[1] = {
             "mac"       : data[0].mac,
-            "marker"    : null,
+            "marker"    : mark,
         }
 
         // motes
@@ -125,17 +133,6 @@ function create_links(data){
     var loc;
 
     // update motes location and board type
-
-    //-- manager
-    var color   = getMoteColor(data[0].board);
-    motes[1].marker = createMarker(
-        data[0].latitude,
-        data[0].longitude,
-        "Manager<br>"+data[0].mac+"<br>"+data[0].board,
-        color
-        );
-
-    //-- motes
     for (var i=0; i < data.length; i++) {
         loc = new google.maps.LatLng(
             data[i].value.latitude,
