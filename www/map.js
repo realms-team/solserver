@@ -28,11 +28,7 @@ function initMap() {
         center: new google.maps.LatLng(0, 0),
         zoom: 18,
         scaleControl: true,
-        styles: [
-        {
-          featureType: 'landscape.man_made',
-          "stylers": [ { "visibility": "off" } ],
-        }],
+        tilt: 0,
     });
     map.setMapTypeId(google.maps.MapTypeId.SATELLITE);
 
