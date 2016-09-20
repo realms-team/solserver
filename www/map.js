@@ -28,6 +28,7 @@ function initMap() {
         center: new google.maps.LatLng(0, 0),
         zoom: 18,
         scaleControl: true,
+        tilt: 0,
     });
     map.setMapTypeId(google.maps.MapTypeId.SATELLITE);
 
@@ -102,6 +103,7 @@ function get_links(host, path, sitename, date){
 function create_motes(data){
     if (Object.keys(data).length > 0) {
 
+        // motes
         mote_list = data[0].value.mote
         for (var i=0; i < Object.keys(mote_list).length; i++) {
             // populate table
@@ -110,6 +112,15 @@ function create_motes(data){
                 "marker"    : null
             }
         }
+
+        // manager
+        var color   = getMoteColor(data[0].value.board);
+        motes[1].marker = createMarker(
+            data[0].value.latitude,
+            data[0].value.longitude,
+            "Manager<br>"+data[0].mac+"<br>"+data[0].value.board,
+            color
+        );
     }
 }
 
@@ -124,7 +135,7 @@ function create_links(data){
             data[i].value.longitude
         );
         bounds.extend(loc);
-        udpateMote(
+        updateMote(
             data[i].mac,
             data[i].value.latitude,
             data[i].value.longitude,
@@ -275,7 +286,7 @@ function getMoteColor(board){
     return "#FFF"
 }
 
-function udpateMote(mac, lat, lng, board){
+function updateMote(mac, lat, lng, board){
     var moteId  = null;
     var color   = getMoteColor(board)
     for (var i=0; i<motes.length; i++) {
