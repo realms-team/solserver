@@ -171,7 +171,9 @@ class Server(threading.Thread):
                        method='GET',
                        callback=self._cb_root_GET,
                        name='static')
-        self.web.route(path=['/map/<sitename>/<filename>', '/map/<sitename>/'],
+        self.web.route(path=['/map/<sitename>/<filename>',
+                            '/map/<sitename>/',
+                            '/map/<sitename>'],
                        method='GET',
                        callback=self._cb_map_GET,
                        name='static')
