@@ -171,15 +171,15 @@ class Server(threading.Thread):
                        method='GET',
                        callback=self._cb_root_GET,
                        name='static')
-        self.web.route(path=['/dashboard/<sitename>/<mac>/'],
-                       method='GET',
-                       callback=self._cb_dashboard_GET,
-                       name='static')
         self.web.route(path=['/map/<sitename>/<filename>',
                             '/map/<sitename>/',
                             '/map/<sitename>'],
                        method='GET',
                        callback=self._cb_map_GET,
+                       name='static')
+        self.web.route(path=['/api/v1/dashboard/<sitename>/<mac>/'],
+                       method='GET',
+                       callback=self._cb_dashboard_GET,
                        name='static')
         self.web.route(path=['/api/v1/jsonp/<site>/<sol_type>/time/<utc_time>'],
                        method='GET',
