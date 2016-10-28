@@ -171,6 +171,10 @@ class Server(threading.Thread):
                        method='GET',
                        callback=self._cb_root_GET,
                        name='static')
+        self.web.route(path=['/dashboard/<sitename>/<mac>/'],
+                       method='GET',
+                       callback=self._cb_dashboard_GET,
+                       name='static')
         self.web.route(path=['/map/<sitename>/<filename>',
                             '/map/<sitename>/',
                             '/map/<sitename>'],
@@ -248,6 +252,12 @@ class Server(threading.Thread):
 
     def _cb_root_GET(self, filename="index.html"):
         return bottle.static_file(filename, "www")
+
+    def _cb_dashboard_GET(self, sitename, mac):
+        bottle.response.status = 303
+        redir_url = "../../../grafana/dashboard/db/dynamic?"
+        redir_url+= "panelId=1&fullscreen&site={0}&mac={1}".format(sitename, mac)
+        bottle.redirect(redir_url)
 
     def _cb_map_GET(self, sitename, filename=""):
         if filename == "":
