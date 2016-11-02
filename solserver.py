@@ -256,7 +256,7 @@ class Server(threading.Thread):
     def _cb_graph_GET(self, mac):
         bottle.response.status = 303
         redir_url = "../../grafana/dashboard/db/dynamic?"
-        redir_url+= "panelId=1&fullscreen&mac='{0}'".format(mac)
+        redir_url+= "panelId=1&fullscreen&var-mac='{0}'".format(mac)
         bottle.redirect(redir_url)
 
     def _cb_map_GET(self, sitename, filename=""):
