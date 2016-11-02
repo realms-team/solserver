@@ -177,9 +177,9 @@ class Server(threading.Thread):
                        method='GET',
                        callback=self._cb_map_GET,
                        name='static')
-        self.web.route(path=['/api/v1/dashboard/<sitename>/<mac>/'],
+        self.web.route(path=['/mote/<mac>/'],
                        method='GET',
-                       callback=self._cb_dashboard_GET,
+                       callback=self._cb_graph_GET,
                        name='static')
         self.web.route(path=['/api/v1/jsonp/<site>/<sol_type>/time/<utc_time>'],
                        method='GET',
@@ -253,10 +253,10 @@ class Server(threading.Thread):
     def _cb_root_GET(self, filename="index.html"):
         return bottle.static_file(filename, "www")
 
-    def _cb_dashboard_GET(self, sitename, mac):
+    def _cb_graph_GET(self, mac):
         bottle.response.status = 303
-        redir_url = "../../../../../grafana/dashboard/db/dynamic?"
-        redir_url+= "panelId=1&fullscreen&site={0}&mac={1}".format(sitename, mac)
+        redir_url = "../../grafana/dashboard/db/dynamic?"
+        redir_url+= "panelId=1&fullscreen&mac={1}".format(mac)
         bottle.redirect(redir_url)
 
     def _cb_map_GET(self, sitename, filename=""):
