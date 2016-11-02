@@ -12,8 +12,8 @@ var UNKNOWN_LINK_COLOR  = "#ffffff"     // white
 
 // Global variables
 var map;
-var motes   = [];         // a list of motes, indexed by id
-var links   = [];         // a list of links
+var mote_list   = [];         // a list of motes {mac,marker}
+var link_list   = [];         // a list of links
 var timeout;
 var infoWindow;
 var SITE_TIME_OFFSET    = -3
@@ -79,7 +79,7 @@ function load_data(loop){
 
 // request the server for mote information
 function get_motes(host, path, sitename, date){
-    var solType     = "SOL_TYPE_DUST_SNAPSHOT";
+    var solType     = "SOL_TYPE_DUST_NOTIF_HRNEIGHBORS";
     var encType     = encodeURIComponent(solType);
     var isoTime     = date.toISOString();
     var encTime     = encodeURIComponent(isoTime);
@@ -90,7 +90,7 @@ function get_motes(host, path, sitename, date){
 
 // request the server for links information
 function get_links(host, path, sitename, date){
-    var solType     = "SOL_TYPE_DUST_NOTIF_HRNEIGHBORS";
+    var solType     = "SOL_TYPE_DUST_SNAPSHOT";
     var encType     = encodeURIComponent(solType);
     var isoTime     = date.toISOString();
     var encTime     = encodeURIComponent(isoTime);
@@ -101,35 +101,14 @@ function get_links(host, path, sitename, date){
 
 // populate the motes list
 function create_motes(data){
-    if (Object.keys(data).length > 0) {
-
-        // motes
-        mote_list = data[0].value.mote
-        for (var i=0; i < Object.keys(mote_list).length; i++) {
-            // populate table
-            motes[mote_list[i].moteId] = {
-                "mac"       : mote_list[i].macAddress,
-                "marker"    : null
-            }
-        }
-
-        // manager
-        var color   = getMoteColor(data[0].value.board);
-        motes[1].marker = createMarker(
-            data[0].value.latitude,
-            data[0].value.longitude,
-            "Manager<br>"+data[0].mac+"<br>"+data[0].value.board,
-            color
-        );
-    }
-}
-
-function create_links(data){
     var bounds = new google.maps.LatLngBounds();
     var loc;
 
-    // update motes location and board type
     for (var i=0; i < data.length; i++) {
+        mote_list.push({
+            "mac"       : data[i].mac,
+            "marker"    : null
+        });
         loc = new google.maps.LatLng(
             data[i].value.latitude,
             data[i].value.longitude
@@ -139,54 +118,41 @@ function create_links(data){
             data[i].mac,
             data[i].value.latitude,
             data[i].value.longitude,
-            data[i].value.board);
+            data[i].value.board
+        );
+
+        // fit map boundaries
+        map.fitBounds(bounds);
+        map.panToBounds(bounds);
     }
-    map.fitBounds(bounds);
-    map.panToBounds(bounds);
+}
+function create_links(data){
+    // loop through snapshot
+    if (Object.keys(data).length > 0) {
 
-    // create links
-    for (var i=0; i < data.length; i++) {
-        for (var n_id in data[i].value.neighbors){
-            var neighbor = data[i].value.neighbors[n_id]
-            if (neighbor.neighborId in motes){
-                var crd1 = getLocationFromMac(data[i].mac);
-                var crd2 = getLocationFromId(neighbor.neighborId)
-                if (crd1 != null && crd2 != null){
-                    var lineCoords = [crd1, crd2];
-                    var link    = getLink(crd1, crd2);
+        // add the manager to the map
+        create_manager(data);
 
-                    // get metric
-                    var pdr = DEFAULT_PDR //init to unpossible value
-                    if (neighbor.numTxPackets > 0){
-                        pdr     = ((neighbor.numTxPackets - neighbor.numTxFailures)
-                                    /neighbor.numTxPackets
-                                ) * 100;
-                    }
-                    var rssi    = neighbor.rssi;
+        motes = data[0].value.mote
+        //for each mote
+        for (var i in motes) {
+            m = motes[i]
+              //for each path
+              for (var j in m.paths){
+                  n = m.paths[j];
+                  if ((n.macAddress != null) && (n.direction == 2 || n.direction == 3)){
+                    var crd1 = getLocationFromMac(m.macAddress);
+                    var crd2 = getLocationFromMac(n.macAddress)
+                    if (crd1 != null && crd2 != null){
+                        var lineCoords = [crd1, crd2];
 
+                        // get metric
+                        var pdr = n.quality;
+                        var rssi = Math.min(n.rssiDestSrc,n.rssiSrcDest);
 
-                    // update link if already exists
-                    if (link != null){
-                        link.metric.rssi    = Math.min(rssi, link.metric.rssi)
-                        link.metric.pdr     = Math.min(pdr, link.metric.pdr)
-
-                        link.pline.setMap(null);
-                        var color   = getLinkColor(link.metric.rssi, link.metric.pdr);
-                        var dist    = calcDistance(lineCoords[0],lineCoords[1])
-                        // set line parameters
-                        if (link.metric.pdr == DEFAULT_PDR)
-                          s_pdr = "No Tx"
-                        else
-                          s_pdr = link.metric.pdr + "%"
-                        var content =   "RSSI: " + rssi + "dBm<br>" +
-                                        "PDR: " + s_pdr + "<br>" +
-                                        "Distance: " + dist + "m"
-                        link.pline  = createPolyline(lineCoords, content, color);
-                    } // create link if it does not already exists
-                    else {
+                        // create link
                         var color   = getLinkColor(rssi, pdr);
                         var dist    = calcDistance(lineCoords[0],lineCoords[1])
-                        // set line parameters
                         // set line parameters
                         if (pdr == DEFAULT_PDR)
                           s_pdr = "No Tx"
@@ -207,11 +173,22 @@ function create_links(data){
                     }
                 }
             }
-            else {console.log("ID not found:" + neighbor.neighborId);}
         }
     }
 }
 
+function create_manager(data){
+    var color   = getMoteColor(data[0].value.board);
+
+    mote_list.push({
+        "mac"         : data[0].mac,
+        "marker"      : createMarker(
+            data[0].value.latitude,
+            data[0].value.longitude,
+            "Manager<br>"+data[0].mac+"<br>"+data[0].value.board,
+            color)
+    });
+}
 //----------------Interface Listeners ---------------------------------------//
 
 $(document).ready(function() {
@@ -289,19 +266,17 @@ function getMoteColor(board){
 function updateMote(mac, lat, lng, board){
     var moteId  = null;
     var color   = getMoteColor(board)
-    for (var i=0; i<motes.length; i++) {
-        if (i in motes){
-            if (motes[i].mac == mac){
-                var content = mac + "<br>"
-                if (board != null)
-                  content += board + "<br>"
-                if (motes[i].marker == null){
-                    motes[i].marker = createMarker(lat, lng, content, color);
-                } else if (motes[i].marker.position.lat() != lat ||
-                            motes[i].marker.position.lng() != lng) {
-                    motes[i].marker.setMap(null);
-                    motes[i].marker = createMarker(lat, lng, content, color);
-                }
+    for (var i=0; i<mote_list.length; i++) {
+        if (mote_list[i].mac == mac){
+            var content = mac + "<br>"
+            if (board != null)
+              content += board + "<br>"
+            if (mote_list[i].marker == null){
+                mote_list[i].marker = createMarker(lat, lng, content, color);
+            } else if (mote_list[i].marker.position.lat() != lat ||
+                        mote_list[i].marker.position.lng() != lng) {
+                mote_list[i].marker.setMap(null);
+                mote_list[i].marker = createMarker(lat, lng, content, color);
             }
         }
     }
@@ -334,38 +309,10 @@ function createPolyline(lineCoordinates, content, color){
     return line;
 }
 
-function getLink(LatLng1, LatLng2){
-    for (i=0; i<links.length; i++) {
-        var link = links[i].pline;
-        var coord1 = "("+link.getPath().getAt(0).lat()+", "+link.getPath().getAt(0).lng()+")"
-        var coord2 = "("+link.getPath().getAt(1).lat()+", "+link.getPath().getAt(1).lng()+")"
-        if ( ((LatLng1.toString() == coord1) && (LatLng2.toString() == coord2)) ||
-             ((LatLng2.toString() == coord1) && (LatLng1.toString() == coord2))
-           ){
-            return links[i]
-        }
-    }
-    return null
-}
-
-function getMoteFromId(moteId){
-    if (motes[moteId].marker != null)
-        return motes[moteId].marker.position;
-    else
-        return null;
-}
-
-function getLocationFromId(moteId){
-    if (motes[moteId].marker != null)
-        return motes[moteId].marker.position;
-    else
-        return null;
-}
-
 function getLocationFromMac(mac){
-    for( i=0; i<motes.length; i++ ) {
-        if (i in motes && motes[i].mac == mac){
-            return motes[i].marker.position;
+    for( i=0; i<mote_list.length; i++ ) {
+        if (mote_list[i].mac == mac){
+            return mote_list[i].marker.position;
         }
     }
     console.log("MAC not found:" + mac)
