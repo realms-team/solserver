@@ -21,7 +21,6 @@ import traceback
 import datetime
 from   optparse                 import OptionParser
 from   ConfigParser             import SafeConfigParser
-import logging
 import logging.config
 
 # third-party packages
@@ -43,7 +42,7 @@ log.setLevel(logging.DEBUG)
 #============================ defines =========================================
 
 DEFAULT_TCPPORT              = 8081
-DEFAULT_SOLSERVERHOST        = '0.0.0.0' # listen on all interfaces
+DEFAULT_SOLSERVERHOST        = '0.0.0.0'  # listen on all interfaces
 
 DEFAULT_CONFIGFILE           = 'solserver.config'
 DEFAULT_CRASHLOG             = 'solserver.crashlog'
@@ -66,10 +65,11 @@ STAT_NUM_SET_ACTION_REQ      = 'NUM_SET_ACTION_REQ'
 
 #============================ helpers =========================================
 
-def logCrash(threadName,err):
+
+def logCrash(threadName, err):
     output  = []
     output += ["============================================================="]
-    output += [time.strftime("%m/%d/%Y %H:%M:%S UTC",time.gmtime())]
+    output += [time.strftime("%m/%d/%Y %H:%M:%S UTC", time.gmtime())]
     output += [""]
     output += ["CRASH in Thread {0}!".format(threadName)]
     output += [""]
@@ -86,12 +86,13 @@ def logCrash(threadName,err):
 
 #============================ classes =========================================
 
+
 class AppData(object):
     _instance = None
     _init     = False
     def __new__(cls, *args, **kwargs):
         if not cls._instance:
-            cls._instance = super(AppData,cls).__new__(cls, *args, **kwargs)
+            cls._instance = super(AppData, cls).__new__(cls, *args, **kwargs)
         return cls._instance
     def __init__(self):
         if self._init:
@@ -99,17 +100,17 @@ class AppData(object):
         self._init      = True
         self.dataLock   = threading.RLock()
         try:
-            with open(DEFAULT_BACKUPFILE,'r') as f:
+            with open(DEFAULT_BACKUPFILE, 'r') as f:
                 self.data = pickle.load(f)
         except (EnvironmentError, pickle.PickleError):
             self.data = {
-                'stats' : {},
-                'config' : {
+                'stats': {},
+                'config': {
                     'solmanagertoken':         DEFAULT_SOLMANAGERTOKEN,
                 },
             }
             self._backupData()
-    def incrStats(self,statName,step=1):
+    def incrStats(self, statName, step=1):
         with self.dataLock:
             if statName not in self.data['stats']:
                 self.data['stats'][statName] = 0
@@ -117,20 +118,21 @@ class AppData(object):
     def getStats(self):
         with self.dataLock:
             return self.data['stats'].copy()
-    def getConfig(self,key):
+    def getConfig(self, key):
         with self.dataLock:
             return self.data['config'][key]
     def getAllConfig(self):
         with self.dataLock:
             return self.data['config'].copy()
-    def setConfig(self,key,value):
+    def setConfig(self, key, value):
         with self.dataLock:
             self.data['config'][key] = value
         self._backupData()
     def _backupData(self):
         with self.dataLock:
-            with open(DEFAULT_BACKUPFILE,'w') as f:
-                pickle.dump(self.data,f)
+            with open(DEFAULT_BACKUPFILE, 'w') as f:
+                pickle.dump(self.data, f)
+
 
 class CherryPySSL(bottle.ServerAdapter):
     def run(self, handler):
@@ -138,8 +140,8 @@ class CherryPySSL(bottle.ServerAdapter):
         from cherrypy.wsgiserver.ssl_pyopenssl import pyOpenSSLAdapter
         server = wsgiserver.CherryPyWSGIServer((self.host, self.port), handler)
         server.ssl_adapter = pyOpenSSLAdapter(
-            certificate           = DEFAULT_SOLSERVERCERT,
-            private_key           = DEFAULT_SOLSERVERPRIVKEY,
+            certificate = DEFAULT_SOLSERVERCERT,
+            private_key = DEFAULT_SOLSERVERPRIVKEY,
         )
         try:
             server.start()
@@ -147,9 +149,10 @@ class CherryPySSL(bottle.ServerAdapter):
         finally:
             server.stop()
 
+
 class Server(threading.Thread):
 
-    def __init__(self,tcpport):
+    def __init__(self, tcpport):
 
         # store params
         self.tcpport    = tcpport
@@ -220,7 +223,7 @@ class Server(threading.Thread):
             raise
 
         except Exception as err:
-            logCrash(self.name,err)
+            logCrash(self.name, err)
 
         log.info("Web server started")
 
@@ -243,7 +246,7 @@ class Server(threading.Thread):
         for item in self.actions:
             if item["site"] == site:
                 actions.append(item)
-        self.actions = [] # removing previous actions
+        self.actions = []  # removing previous actions
         return actions
 
     #======================== private =========================================
@@ -255,8 +258,8 @@ class Server(threading.Thread):
 
     def _cb_graph_GET(self, mac):
         bottle.response.status = 303
-        redir_url = "../../grafana/dashboard/db/dynamic?"
-        redir_url+= "panelId=1&fullscreen&mac='{0}'".format(mac)
+        redir_url  = "../../grafana/dashboard/db/dynamic?"
+        redir_url += "panelId=1&fullscreen&mac='{0}'".format(mac)
         bottle.redirect(redir_url)
 
     def _cb_map_GET(self, sitename, filename=""):
@@ -270,7 +273,7 @@ class Server(threading.Thread):
         clean = self._check_map_query(site)
         clean = clean and self._check_map_query(sol_type)
         clean = clean and self._check_map_query(utc_time)
-        if not clean :
+        if not clean:
             return "Wrong parameters"
 
         # build InfluxDB query
@@ -319,7 +322,6 @@ class Server(threading.Thread):
            2. solserver tells solmanager to update its SOL library
         """
 
-        global solserver
         try:
             # update stats
             AppData().incrStats(STAT_NUM_JSON_REQ)
@@ -334,7 +336,7 @@ class Server(threading.Thread):
             raise
 
         except Exception as err:
-            logCrash(self.name,err)
+            logCrash(self.name, err)
             raise
 
     def _cb_setaction_POST(self, action, site, token):
@@ -344,7 +346,6 @@ class Server(threading.Thread):
         periodically ask the server for actions.
         """
 
-        global solserver
         try:
             # update stats
             AppData().incrStats(STAT_NUM_SET_ACTION_REQ)
@@ -370,7 +371,7 @@ class Server(threading.Thread):
             raise
 
         except Exception as err:
-            logCrash(self.name,err)
+            logCrash(self.name, err)
             raise
 
     def _cb_echo_POST(self):
@@ -388,7 +389,7 @@ class Server(threading.Thread):
             raise
 
         except Exception as err:
-            logCrash(self.name,err)
+            logCrash(self.name, err)
             raise
 
     def _cb_status_GET(self):
@@ -416,7 +417,7 @@ class Server(threading.Thread):
             raise
 
         except Exception as err:
-            logCrash(self.name,err)
+            logCrash(self.name, err)
             raise
 
     def _cb_o_PUT(self):
@@ -458,13 +459,13 @@ class Server(threading.Thread):
 
                 # convert json->influxdb
                 tags = self._get_tags(authorized_site, self._formatBuffer(sol_json["mac"]))
-                sol_influxdbl    += [self.sol.json_to_influxdb(sol_json,tags)]
+                sol_influxdbl    += [self.sol.json_to_influxdb(sol_json, tags)]
 
             # write to database
             try:
                 self.influxClient.write_points(sol_influxdbl)
             except:
-                AppData().incrStats(STAT_NUM_OBJECTS_DB_FAIL,1)
+                AppData().incrStats(STAT_NUM_OBJECTS_DB_FAIL, 1)
                 raise
             else:
                 AppData().incrStats(STAT_NUM_OBJECTS_DB_OK,)
@@ -473,7 +474,7 @@ class Server(threading.Thread):
             raise
 
         except Exception as err:
-            logCrash(self.name,err)
+            logCrash(self.name, err)
             raise
 
     #=== misc
@@ -481,15 +482,15 @@ class Server(threading.Thread):
     @staticmethod
     def _get_tags(site_name, mac):
         """
-        :param mac str: a dash-separeted mac address
+        :param str mac : a dash-separeted mac address
         :return: the tags associated to the given mac address
         :rtype: dict
         Notes: tags are read from 'site.py' file
         """
-        return_tags = { "mac" : mac } # default tag is only mac
+        return_tags = {"mac": mac}  # default tag is only mac
         for site in sites.SITES:
             if site["name"] == site_name:
-                for key,tags in site["motes"].iteritems():
+                for key, tags in site["motes"].iteritems():
                     if mac == key:
                         return_tags.update(tags)
                         return_tags["site"] = site["name"]
@@ -497,10 +498,10 @@ class Server(threading.Thread):
 
     @staticmethod
     def _formatBuffer(buf):
-        '''
+        """
         example: [0x11,0x22,0x33,0x44,0x55,0x66,0x77,0x88] -> "11-22-33-44-55-66-77-88"
-        '''
-        return '-'.join(["%.2x"%i for i in buf])
+        """
+        return '-'.join(["%.2x" %i for i in buf])
 
     def _authorizeClient(self, token=None, site_name=None):
         token_match = False
@@ -516,7 +517,7 @@ class Server(threading.Thread):
 
         if not token_match:
             AppData().incrStats(STAT_NUM_JSON_UNAUTHORIZED)
-            log.warn("Unauthorized - Invalid Token: %s",token)
+            log.warn("Unauthorized - Invalid Token: %s", token)
             raise bottle.HTTPResponse(
                 body   = json.dumps({'error': 'Unauthorized'}),
                 status = 401,
@@ -525,7 +526,7 @@ class Server(threading.Thread):
         else:
             return site_name
 
-    def _exec_cmd(self,cmd):
+    def _exec_cmd(self, cmd):
         returnVal = None
         try:
             returnVal = subprocess.check_output(cmd, shell=False)
@@ -549,17 +550,20 @@ class Server(threading.Thread):
 
 solserver = None
 
+
 def quitCallback():
     solserver.close()
     log.info("================================== Solserver stopped")
+
 
 def cli_cb_stats(params):
     stats = AppData().getStats()
     output = []
     for k in sorted(stats.keys()):
-        output += ['{0:<30}: {1}'.format(k,stats[k])]
+        output += ['{0:<30}: {1}'.format(k, stats[k])]
     output = '\n'.join(output)
     print output
+
 
 def main(tcpport):
     global solserver
@@ -576,7 +580,7 @@ def main(tcpport):
         solserver_version.VERSION,
         quitCallback,
         [
-            ("Sol",SolVersion.VERSION),
+            ("Sol", SolVersion.VERSION),
         ],
     )
     cli.registerCommand(
@@ -593,27 +597,27 @@ if __name__ == '__main__':
     cf_parser.read(DEFAULT_CONFIGFILE)
 
     if cf_parser.has_section('solmanager'):
-        if cf_parser.has_option('solmanager','token'):
-            DEFAULT_SOLMANAGERTOKEN = cf_parser.get('solmanager','token')
+        if cf_parser.has_option('solmanager', 'token'):
+            DEFAULT_SOLMANAGERTOKEN = cf_parser.get('solmanager', 'token')
 
     if cf_parser.has_section('solserver'):
-        if cf_parser.has_option('solserver','host'):
-            DEFAULT_SOLSERVER = cf_parser.get('solserver','host')
-        if cf_parser.has_option('solserver','tcpport'):
-            DEFAULT_TCPPORT = cf_parser.getint('solserver','tcpport')
-        if cf_parser.has_option('solserver','certfile'):
-            DEFAULT_SOLSERVERCERT = cf_parser.get('solserver','certfile')
-        if cf_parser.has_option('solserver','privatekey'):
-            DEFAULT_SOLSERVERPRIVKEY = cf_parser.get('solserver','privatekey')
-        if cf_parser.has_option('solserver','backupfile'):
-            DEFAULT_BACKUPFILE = cf_parser.get('solserver','backupfile')
+        if cf_parser.has_option('solserver', 'host'):
+            DEFAULT_SOLSERVERHOST = cf_parser.get('solserver', 'host')
+        if cf_parser.has_option('solserver', 'tcpport'):
+            DEFAULT_TCPPORT = cf_parser.getint('solserver', 'tcpport')
+        if cf_parser.has_option('solserver', 'certfile'):
+            DEFAULT_SOLSERVERCERT = cf_parser.get('solserver', 'certfile')
+        if cf_parser.has_option('solserver', 'privatekey'):
+            DEFAULT_SOLSERVERPRIVKEY = cf_parser.get('solserver', 'privatekey')
+        if cf_parser.has_option('solserver', 'backupfile'):
+            DEFAULT_BACKUPFILE = cf_parser.get('solserver', 'backupfile')
     log.debug("Configuration:\n" +\
             "\tSOL_SERVER_HOST: '%s'\n"             +\
             "\tDEFAULT_TCPPORT: %d\n"               +\
             "\tDEFAULT_SOLSERVERCERT:  '%s'\n"      +\
             "\tDEFAULT_SOLSERVERPRIVKEY: '%s'\n"    +\
             "\tDEFAULT_BACKUPFILE: '%s'\n"          ,
-            DEFAULT_SOLSERVER,
+            DEFAULT_SOLSERVERHOST,
             DEFAULT_TCPPORT,
             DEFAULT_SOLSERVERCERT,
             DEFAULT_SOLSERVERPRIVKEY,
