@@ -276,32 +276,32 @@ class Server(threading.Thread):
         # build InfluxDB query
         query = "SELECT * FROM " + sol_type
         if site != "all":
-            query = query + " WHERE site = '" + site + "'"
+            query += " WHERE site = '" + site + "'"
         else:
             # select all sites
-            query = query + " WHERE site =~ //"
+            query += " WHERE site =~ //"
         if sol_type == "SOL_TYPE_DUST_NOTIF_HRNEIGHBORS":
             # compute time - 16min
             start_time = datetime.datetime.strptime(
                         utc_time, '%Y-%m-%dT%H:%M:%S.%fZ') - \
                         datetime.timedelta(minutes=16)
             start_time = start_time.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-            query = query + " AND time < '" + utc_time + "'"
-            query = query + " AND time > '" + start_time + "'"
-            query = query + ' GROUP BY "mac" ORDER BY time DESC LIMIT 1'
+            query += " AND time < '" + utc_time + "'"
+            query += " AND time > '" + start_time + "'"
+            query += ' GROUP BY "mac" ORDER BY time DESC LIMIT 1'
         elif sol_type == "SOL_TYPE_DUST_SNAPSHOT":
             # compute time - 16min
             start_time = datetime.datetime.strptime(
                         utc_time, '%Y-%m-%dT%H:%M:%S.%fZ') - \
                         datetime.timedelta(minutes=61)
             start_time = start_time.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-            query = query + " AND time < '" + utc_time + "'"
-            query = query + " AND time > '" + start_time + "'"
-            query = query + ' GROUP BY "mac" ORDER BY time DESC LIMIT 1'
+            query += " AND time < '" + utc_time + "'"
+            query += " AND time > '" + start_time + "'"
+            query += ' GROUP BY "mac" ORDER BY time DESC LIMIT 1'
         elif sol_type == "SOL_TYPE_SOLMANAGER_STATS":
-            query = query + ' GROUP BY "mac" ORDER BY time DESC LIMIT 1'
+            query += ' GROUP BY "mac" ORDER BY time DESC LIMIT 1'
         else:
-            query = query + ' GROUP BY "mac" ORDER BY time DESC'
+            query += ' GROUP BY "mac" ORDER BY time DESC'
 
         # send query, parse the result and return the output in json
         influx_json = self.influxClient.query(query).raw
