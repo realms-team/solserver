@@ -446,12 +446,12 @@ class Server(threading.Thread):
             if bottle.request.json is None:
                 raise bottle.HTTPResponse(
                     body   = json.dumps(
-                                {'error': 'Malformed JSON body'}
-                            ),
+                        {'error': 'Malformed JSON body'}
+                    ),
                     status = 400,
                     headers= {'Content-Type': 'application/json'},
                 )
-
+            
             # http->bin
             try:
                 sol_binl = self.sol.http_to_bin(bottle.request.json)
