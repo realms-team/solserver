@@ -65,7 +65,6 @@ STAT_NUM_SET_ACTION_REQ      = 'NUM_SET_ACTION_REQ'
 
 #============================ helpers =========================================
 
-
 def logCrash(threadName, err):
     output  = []
     output += ["============================================================="]
@@ -85,7 +84,6 @@ def logCrash(threadName, err):
     log.critical(output)
 
 #============================ classes =========================================
-
 
 class AppData(object):
     _instance = None
@@ -133,12 +131,11 @@ class AppData(object):
             with open(DEFAULT_BACKUPFILE, 'w') as f:
                 pickle.dump(self.data, f)
 
-
-class CherryPySSL(bottle.ServerAdapter):
+class HTTPSServer(bottle.ServerAdapter):
     def run(self, handler):
-        from cherrypy import wsgiserver
-        from cherrypy.wsgiserver.ssl_pyopenssl import pyOpenSSLAdapter
-        server = wsgiserver.CherryPyWSGIServer((self.host, self.port), handler)
+        from cheroot.wsgi import Server as WSGIServer
+        from cheroot.ssl.pyopenssl import pyOpenSSLAdapter
+        server = WSGIServer((self.host, self.port), handler)
         server.ssl_adapter = pyOpenSSLAdapter(
             certificate = DEFAULT_SOLSERVERCERT,
             private_key = DEFAULT_SOLSERVERPRIVKEY,
@@ -148,7 +145,6 @@ class CherryPySSL(bottle.ServerAdapter):
             log.info("Server started")
         finally:
             server.stop()
-
 
 class Server(threading.Thread):
 
@@ -170,38 +166,55 @@ class Server(threading.Thread):
 
         # initialize web server
         self.web        = bottle.Bottle()
-        self.web.route(path=["/<filename>"],
-                       method='GET',
-                       callback=self._cb_root_GET,
-                       name='static')
-        self.web.route(path=['/map/<sitename>/<filename>',
-                            '/map/<sitename>/',
-                            '/map/<sitename>'],
-                       method='GET',
-                       callback=self._cb_map_GET,
-                       name='static')
-        self.web.route(path=['/mote/<mac>/'],
-                       method='GET',
-                       callback=self._cb_graph_GET,
-                       name='static')
-        self.web.route(path=['/api/v1/jsonp/<site>/<sol_type>/time/<utc_time>'],
-                       method='GET',
-                       callback=self._cb_jsonp_GET)
-        self.web.route(path=['/api/v1/getactions/'],
-                       method='GET',
-                       callback=self._cb_getactions_GET)
-        self.web.route(path=['/api/v1/setaction/<action>/site/<site>/token/<token>'],
-                       method='POST',
-                       callback=self._cb_setaction_POST)
-        self.web.route(path='/api/v1/echo.json',
-                       method='POST',
-                       callback=self._cb_echo_POST)
-        self.web.route(path='/api/v1/status.json',
-                       method='GET',
-                       callback=self._cb_status_GET)
-        self.web.route(path='/api/v1/o.json',
-                       method='PUT',
-                       callback=self._cb_o_PUT)
+        self.web.route(
+            path        = "/<filename>",
+            method      = 'GET',
+            callback    = self._webhandle_root_GET,
+        )
+        self.web.route(
+            path        = [
+                '/map/<sitename>/<filename>',
+                '/map/<sitename>/',
+                '/map/<sitename>',
+            ],
+            method      = 'GET',
+            callback    = self._webhandle_map_GET,
+        )
+        self.web.route(
+            path        = '/mote/<mac>/',
+            method      = 'GET',
+            callback    = self._cb_graph_GET,
+        )
+        self.web.route(
+            path        = '/api/v1/jsonp/<site>/<sol_type>/time/<utc_time>',
+            method      = 'GET',
+            callback    = self._cb_jsonp_GET
+        )
+        self.web.route(
+            path        = '/api/v1/getactions/',
+            method      = 'GET',
+            callback    = self._cb_getactions_GET,
+        )
+        self.web.route(
+            path        = '/api/v1/setaction/<action>/site/<site>/token/<token>',
+            method      = 'POST',
+            callback    = self._cb_setaction_POST,
+        )
+        self.web.route(
+            path        = '/api/v1/echo.json',
+            method      = 'POST',
+            callback    = self._cb_echo_POST,
+        )
+        self.web.route(
+            path        = '/api/v1/status.json',
+            method      = 'GET',
+            callback    = self._cb_status_GET,
+        )
+        self.web.route(
+            path        = '/api/v1/o.json',
+            method      = 'PUT',
+            callback    = self._cb_o_PUT,
+        )
 
         # start the thread
         threading.Thread.__init__(self)
@@ -214,7 +227,7 @@ class Server(threading.Thread):
             self.web.run(
                 host   = DEFAULT_SOLSERVERHOST,
                 port   = self.tcpport,
-                server = CherryPySSL,
+                server = HTTPSServer,
                 quiet  = True,
                 debug  = False,
             )
@@ -251,9 +264,9 @@ class Server(threading.Thread):
 
     #======================== private =========================================
 
-    #=== JSON request handler
+    #=== webhandlers
 
-    def _cb_root_GET(self, filename="index.html"):
+    def _webhandle_root_GET(self, filename="index.html"):
         return bottle.static_file(filename, "www")
 
     def _cb_graph_GET(self, mac):
@@ -262,7 +275,7 @@ class Server(threading.Thread):
         redir_url += "panelId=1&fullscreen&mac='{0}'".format(mac)
         bottle.redirect(redir_url)
 
-    def _cb_map_GET(self, sitename, filename=""):
+    def _webhandle_map_GET(self, sitename, filename=""):
         if filename == "":
             return bottle.template("www/map", sitename=sitename)
         else:
