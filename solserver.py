@@ -8,6 +8,7 @@ import os
 if __name__ == "__main__":
     here = sys.path[0]
     sys.path.insert(0, os.path.join(here, '..', 'sol'))
+    sys.path.insert(0, os.path.join(here, '..', 'smartmeshsdk','libs'))
 
 # =========================== imports =========================================
 
@@ -462,7 +463,7 @@ class Server(threading.Thread):
                     status = 400,
                     headers= {'Content-Type': 'application/json'},
                 )
-
+            
             # bin->json->influxdb format, then write to put database
             sol_influxdbl = []
             for sol_bin in sol_binl:
