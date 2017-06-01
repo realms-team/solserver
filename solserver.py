@@ -13,26 +13,28 @@ if __name__ == "__main__":
 # =========================== imports =========================================
 
 # from default Python
-import pickle
 import time
 import json
 import subprocess
 import threading
 import traceback
-import datetime
-from   optparse                 import OptionParser
-from   ConfigParser             import SafeConfigParser
+import ConfigParser
 import logging.config
+import datetime
+import sites
 
 # third-party packages
+import OpenSSL
 import bottle
 import influxdb
 
 # project-specific
-import OpenCli
-from solobjectlib import Sol, SolVersion
 import solserver_version
-import sites
+from   dustCli               import DustCli
+from   solobjectlib          import Sol, \
+                                    SolVersion
+
+                                    
 
 #============================ logging =========================================
 
@@ -42,27 +44,7 @@ log.setLevel(logging.DEBUG)
 
 #============================ defines =========================================
 
-DEFAULT_TCPPORT              = 8081
-DEFAULT_SOLSERVERHOST        = '0.0.0.0'  # listen on all interfaces
-
-DEFAULT_CONFIGFILE           = 'solserver.config'
-DEFAULT_CRASHLOG             = 'solserver.crashlog'
-DEFAULT_BACKUPFILE           = 'solserver.backup'
-
-# config file
-
-DEFAULT_SOLMANAGERTOKEN      = 'DEFAULT_SOLMANAGERTOKEN'
-DEFAULT_SOLSERVERCERT        = 'solserver.cert'
-DEFAULT_SOLSERVERPRIVKEY     = 'solserver.ppk'
-
-# stats
-
-STAT_NUM_JSON_REQ            = 'NUM_JSON_REQ'
-STAT_NUM_JSON_UNAUTHORIZED   = 'NUM_JSON_UNAUTHORIZED'
-STAT_NUM_CRASHES             = 'NUM_CRASHES'
-STAT_NUM_OBJECTS_DB_OK       = 'STAT_NUM_OBJECTS_DB_OK'
-STAT_NUM_OBJECTS_DB_FAIL     = 'STAT_NUM_OBJECTS_DB_FAIL'
-STAT_NUM_SET_ACTION_REQ      = 'NUM_SET_ACTION_REQ'
+CONFIGFILE                   = 'solserver.config'
 
 #============================ helpers =========================================
 
@@ -86,82 +68,156 @@ def logCrash(threadName, err):
 
 #============================ classes =========================================
 
-class AppData(object):
+#======== singletons
+
+class AppConfig(object):
+    """
+    Singleton which contains the configuration of the application.
+    
+    Configuration is read once from file CONFIGFILE
+    """
     _instance = None
     _init     = False
+
     def __new__(cls, *args, **kwargs):
         if not cls._instance:
-            cls._instance = super(AppData, cls).__new__(cls, *args, **kwargs)
+            cls._instance = super(AppConfig, cls).__new__(cls, *args, **kwargs)
         return cls._instance
+
+    def __init__(self):
+        if self._init:
+            return
+        self._init = True
+
+        # local variables
+        self.dataLock   = threading.RLock()
+        self.config     = {}
+
+        config          = ConfigParser.ConfigParser()
+        config.read(CONFIGFILE)
+
+        with self.dataLock:
+            for (k,v) in config.items('solserver'):
+                try:
+                    self.config[k] = float(v)
+                except ValueError:
+                    try:
+                        self.config[k] = int(v)
+                    except ValueError:
+                        self.config[k] = v
+
+    def get(self,name):
+        with self.dataLock:
+            return self.config[name]
+
+class AppStats(object):
+    """
+    Singleton which contains the stats of the application.
+    
+    Stats are read once from file STATSFILE.
+    """
+    _instance = None
+    _init     = False
+
+    ALLSTATS  = [
+        'NUM_JSON_REQ',
+        'NUM_JSON_UNAUTHORIZED',
+        'NUM_CRASHES',
+        'STAT_NUM_OBJECTS_DB_OK',
+        'STAT_NUM_OBJECTS_DB_FAIL',
+        'NUM_SET_ACTION_REQ',
+    ]
+    def __new__(cls, *args, **kwargs):
+        if not cls._instance:
+            cls._instance = super(AppStats, cls).__new__(cls, *args, **kwargs)
+        return cls._instance
+
     def __init__(self):
         if self._init:
             return
         self._init      = True
+        
         self.dataLock   = threading.RLock()
+        self.stats      = {}
         try:
-            with open(DEFAULT_BACKUPFILE, 'r') as f:
-                self.data = pickle.load(f)
-        except (EnvironmentError, pickle.PickleError):
-            self.data = {
-                'stats': {},
-                'config': {
-                    'solmanagertoken':         DEFAULT_SOLMANAGERTOKEN,
-                },
-            }
-            self._backupData()
-    def incrStats(self, statName, step=1):
+            with open(STATSFILE, 'r') as f:
+                for line in f:
+                    k        = line.split('=')[0].strip()
+                    v        = line.split('=')[1].strip()
+                    try:
+                        v    = int(v)
+                    except ValueError:
+                        pass
+                    self.stats[k] = v
+                log.info("Stats recovered from file.")
+        except (EnvironmentError, EOFError) as e:
+            log.info("Could not read stats file: %s", e)
+            self._backup()
+    
+    
+    # ======================= public ==========================================
+    
+    def increment(self, statName):
+        self._validateStatName(statName)
         with self.dataLock:
-            if statName not in self.data['stats']:
-                self.data['stats'][statName] = 0
-            self.data['stats'][statName] += step
-    def getStats(self):
-        with self.dataLock:
-            return self.data['stats'].copy()
-    def getConfig(self, key):
-        with self.dataLock:
-            return self.data['config'][key]
-    def getAllConfig(self):
-        with self.dataLock:
-            return self.data['config'].copy()
-    def setConfig(self, key, value):
-        with self.dataLock:
-            self.data['config'][key] = value
-        self._backupData()
-    def _backupData(self):
-        with self.dataLock:
-            with open(DEFAULT_BACKUPFILE, 'w') as f:
-                pickle.dump(self.data, f)
+            if statName not in self.stats:
+                self.stats[statName] = 0
+            self.stats[statName] += 1
+        self._backup()
 
-class HTTPSServer(bottle.ServerAdapter):
-    def run(self, handler):
-        from cheroot.wsgi import Server as WSGIServer
-        from cheroot.ssl.pyopenssl import pyOpenSSLAdapter
-        server = WSGIServer((self.host, self.port), handler)
-        server.ssl_adapter = pyOpenSSLAdapter(
-            certificate = DEFAULT_SOLSERVERCERT,
-            private_key = DEFAULT_SOLSERVERPRIVKEY,
-        )
-        try:
-            server.start()
-            log.info("Server started")
-        finally:
-            server.stop()
+    def update(self, k, v):
+        self._validateStatName(k)
+        with self.dataLock:
+            self.stats[k] = v
+        self._backup()
 
-class Server(threading.Thread):
+    def get(self):
+        with self.dataLock:
+            stats = self.stats.copy()
+        stats['PUBFILE_BACKLOG']   = PubFileThread().getBacklogLength()
+        stats['PUBSERVER_BACKLOG'] = PubServerThread().getBacklogLength()
+        return stats
 
-    def __init__(self, tcpport):
+    # ======================= private =========================================
 
-        # store params
-        self.tcpport    = tcpport
+    def _validateStatName(self, statName):
+        if statName.startswith("NUMRX_")==False:
+            assert statName in self.ALLSTATS
+
+    def _backup(self):
+        with self.dataLock:
+            output = ['{0} = {1}'.format(k,v) for (k,v) in self.stats.items()]
+            output = '\n'.join(output)
+            with open(STATSFILE, 'w') as f:
+                f.write(output)
+
+#======== JSON API to receive notifications from SolManager
+
+class JsonApiThread(threading.Thread):
+    
+    class HTTPSServer(bottle.ServerAdapter):
+        def run(self, handler):
+            from cheroot.wsgi import Server as WSGIServer
+            from cheroot.ssl.pyopenssl import pyOpenSSLAdapter
+            server = WSGIServer((self.host, self.port), handler)
+            server.ssl_adapter = pyOpenSSLAdapter(
+                certificate = AppConfig().get('solserver_certificate'),
+                private_key = AppConfig().get('solserver_private_key'),
+            )
+            try:
+                server.start()
+                log.info("Server started")
+            finally:
+                server.stop()
+    
+    def __init__(self):
 
         # local variables
-        AppData()
         self.sol                  = Sol.Sol()
-        self.solmanagertoken      = DEFAULT_SOLMANAGERTOKEN
         self.influxClient         = influxdb.client.InfluxDBClient(
-            host        = 'localhost',
-            port        = '8086',
-            database    = 'realms'
+            host        = AppConfig().get('inlfuxdb_host'),
+            port        = AppConfig().get('inlfuxdb_port'),
+            database    = AppConfig().get('inlfuxdb_database'),
         )
         self.actions    = []
 
@@ -219,16 +275,16 @@ class Server(threading.Thread):
 
         # start the thread
         threading.Thread.__init__(self)
-        self.name       = 'Server'
+        self.name       = 'JsonApiThread'
         self.daemon     = True
         self.start()
 
     def run(self):
         try:
             self.web.run(
-                host   = DEFAULT_SOLSERVERHOST,
-                port   = self.tcpport,
-                server = HTTPSServer,
+                host   = '0.0.0.0',
+                port   = AppConfig().get('solserver_tcpport'),
+                server = self.HTTPSServer,
                 quiet  = True,
                 debug  = False,
             )
@@ -239,7 +295,7 @@ class Server(threading.Thread):
         except Exception as err:
             logCrash(self.name, err)
 
-        log.info("Web server started")
+        log.info("JsonApiThread started")
 
     #======================== public ==========================================
 
@@ -496,7 +552,7 @@ class Server(threading.Thread):
     @staticmethod
     def _get_tags(site_name, mac):
         """
-        :param str mac : a dash-separeted mac address
+        :param str mac : a dash-separated mac address
         :return: the tags associated to the given mac address
         :rtype: dict
         Notes: tags are read from 'site.py' file
@@ -560,93 +616,42 @@ class Server(threading.Thread):
 
         return check
 
+#======== main application thread
+
+class SolServer(object):
+
+    def __init__(self):
+
+        # API thread
+        self.jsonApiThread  = JsonApiThread()
+
+        # CLI interface
+        self.cli            = DustCli.DustCli("SolServer",self._clihandle_quit)
+        self.cli.registerCommand(
+            name                       = 'stats',
+            alias                      = 's',
+            description                = 'print the stats',
+            params                     = [],
+            callback                   = self._clihandle_stats,
+        )
+    
+    def _clihandle_quit(self):
+        time.sleep(.3)
+        print "bye bye."
+        # all threads as daemonic, will close automatically
+    
+    def _clihandle_stats(self,params):
+        stats = AppData().getStats()
+        output = []
+        for k in sorted(stats.keys()):
+            output += ['{0:<30}: {1}'.format(k, stats[k])]
+        output = '\n'.join(output)
+        print output
+
 #============================ main ============================================
 
-solserver = None
-
-
-def quitCallback():
-    solserver.close()
-    log.info("================================== Solserver stopped")
-
-
-def cli_cb_stats(params):
-    stats = AppData().getStats()
-    output = []
-    for k in sorted(stats.keys()):
-        output += ['{0:<30}: {1}'.format(k, stats[k])]
-    output = '\n'.join(output)
-    print output
-
-
-def main(tcpport):
-    global solserver
-
-    # create the server instance
-    solserver = Server(
-        tcpport
-    )
-    log.info("================================== Solserver started")
-
-    # start the CLI interface
-    cli = OpenCli.OpenCli(
-        "Server",
-        solserver_version.VERSION,
-        quitCallback,
-        [
-            ("Sol", SolVersion.VERSION),
-        ],
-    )
-    cli.registerCommand(
-        'stats',
-        's',
-        'print the stats',
-        [],
-        cli_cb_stats
-    )
+def main():
+    solServer = SolServer()
 
 if __name__ == '__main__':
-    # parse the config file
-    cf_parser = SafeConfigParser()
-    cf_parser.read(DEFAULT_CONFIGFILE)
-
-    if cf_parser.has_section('solmanager'):
-        if cf_parser.has_option('solmanager', 'token'):
-            DEFAULT_SOLMANAGERTOKEN = cf_parser.get('solmanager', 'token')
-
-    if cf_parser.has_section('solserver'):
-        if cf_parser.has_option('solserver', 'host'):
-            DEFAULT_SOLSERVERHOST = cf_parser.get('solserver', 'host')
-        if cf_parser.has_option('solserver', 'tcpport'):
-            DEFAULT_TCPPORT = cf_parser.getint('solserver', 'tcpport')
-        if cf_parser.has_option('solserver', 'certfile'):
-            DEFAULT_SOLSERVERCERT = cf_parser.get('solserver', 'certfile')
-        if cf_parser.has_option('solserver', 'privatekey'):
-            DEFAULT_SOLSERVERPRIVKEY = cf_parser.get('solserver', 'privatekey')
-        if cf_parser.has_option('solserver', 'backupfile'):
-            DEFAULT_BACKUPFILE = cf_parser.get('solserver', 'backupfile')
-    log.debug("Configuration:\n" +\
-            "\tSOL_SERVER_HOST: '%s'\n"             +\
-            "\tDEFAULT_TCPPORT: %d\n"               +\
-            "\tDEFAULT_SOLSERVERCERT:  '%s'\n"      +\
-            "\tDEFAULT_SOLSERVERPRIVKEY: '%s'\n"    +\
-            "\tDEFAULT_BACKUPFILE: '%s'\n"          ,
-            DEFAULT_SOLSERVERHOST,
-            DEFAULT_TCPPORT,
-            DEFAULT_SOLSERVERCERT,
-            DEFAULT_SOLSERVERPRIVKEY,
-            DEFAULT_BACKUPFILE
-            )
-
-    # parse the command line
-    parser = OptionParser("usage: %prog [options]")
-    parser.add_option(
-        "-t", "--tcpport", dest="tcpport",
-        default=DEFAULT_TCPPORT,
-        help="TCP port to start the JSON API on."
-    )
-    (options, args) = parser.parse_args()
-
-    main(
-        options.tcpport,
-    )
+    main()
