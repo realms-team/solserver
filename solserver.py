@@ -61,6 +61,7 @@ def logCrash(threadName, err):
     output += ["=== traceback ==="]
     output += [traceback.format_exc()]
     output  = '\n'.join(output)
+    
     # update stats
     AppData().incrStats(STAT_NUM_CRASHES)
     print output
@@ -223,6 +224,34 @@ class JsonApiThread(threading.Thread):
 
         # initialize web server
         self.web        = bottle.Bottle()
+        # interaction with SolManager
+        self.web.route(
+            path        = '/api/v1/o.json',
+            method      = 'PUT',
+            callback    = self._webhandle_o_PUT,
+        )
+        self.web.route(
+            path        = '/api/v1/getactions/',
+            method      = 'GET',
+            callback    = self._webhandle_getactions_GET,
+        )
+        # interaction with administrator
+        self.web.route(
+            path        = '/api/v1/echo.json',
+            method      = 'POST',
+            callback    = self._webhandle_echo_POST,
+        )
+        self.web.route(
+            path        = '/api/v1/status.json',
+            method      = 'GET',
+            callback    = self._webhandle_status_GET,
+        )
+        self.web.route(
+            path        = '/api/v1/setaction/<action>/site/<site>/token/<token>',
+            method      = 'POST',
+            callback    = self._webhandle_setactions_POST,
+        )
+        # interaction with end user
         self.web.route(
             path        = "/<filename>",
             method      = 'GET',
@@ -240,39 +269,14 @@ class JsonApiThread(threading.Thread):
         self.web.route(
             path        = '/mote/<mac>/',
             method      = 'GET',
-            callback    = self._cb_graph_GET,
+            callback    = self._webhandle_mote_GET,
         )
         self.web.route(
             path        = '/api/v1/jsonp/<site>/<sol_type>/time/<utc_time>',
             method      = 'GET',
-            callback    = self._cb_jsonp_GET
+            callback    = self._webhandle_jsonp_GET
         )
-        self.web.route(
-            path        = '/api/v1/getactions/',
-            method      = 'GET',
-            callback    = self._cb_getactions_GET,
-        )
-        self.web.route(
-            path        = '/api/v1/setaction/<action>/site/<site>/token/<token>',
-            method      = 'POST',
-            callback    = self._cb_setaction_POST,
-        )
-        self.web.route(
-            path        = '/api/v1/echo.json',
-            method      = 'POST',
-            callback    = self._cb_echo_POST,
-        )
-        self.web.route(
-            path        = '/api/v1/status.json',
-            method      = 'GET',
-            callback    = self._cb_status_GET,
-        )
-        self.web.route(
-            path        = '/api/v1/o.json',
-            method      = 'PUT',
-            callback    = self._cb_o_PUT,
-        )
-
+        
         # start the thread
         threading.Thread.__init__(self)
         self.name       = 'JsonApiThread'
@@ -322,15 +326,179 @@ class JsonApiThread(threading.Thread):
     #======================== private =========================================
 
     #=== webhandlers
+    
+    # interaction with SolManager
 
+    def _webhandle_o_PUT(self):
+        try:
+            # update stats
+            AppData().incrStats(STAT_NUM_JSON_REQ)
+
+            # authorize the client
+            authorized_site = self._authorizeClient()
+
+            # abort if malformed JSON body
+            if bottle.request.json is None:
+                raise bottle.HTTPResponse(
+                    body   = json.dumps(
+                        {'error': 'Malformed JSON body'}
+                    ),
+                    status = 400,
+                    headers= {'Content-Type': 'application/json'},
+                )
+            
+            # http->bin
+            try:
+                sol_binl = self.sol.http_to_bin(bottle.request.json)
+            except:
+                raise bottle.HTTPResponse(
+                    body   = json.dumps(
+                                {'error': 'Malformed JSON body contents'}
+                            ),
+                    status = 400,
+                    headers= {'Content-Type': 'application/json'},
+                )
+
+            # bin->json->influxdb format, then write to put database
+            sol_influxdbl = []
+            for sol_bin in sol_binl:
+
+                # convert bin->json
+                sol_json          = self.sol.bin_to_json(sol_bin)
+
+                # convert json->influxdb
+                tags = self._get_tags(authorized_site, self._formatBuffer(sol_json["mac"]))
+                sol_influxdbl    += [self.sol.json_to_influxdb(sol_json, tags)]
+
+            # write to database
+            try:
+                self.influxClient.write_points(sol_influxdbl)
+            except:
+                AppData().incrStats(STAT_NUM_OBJECTS_DB_FAIL, 1)
+                raise
+            else:
+                AppData().incrStats(STAT_NUM_OBJECTS_DB_OK,)
+
+        except bottle.BottleException:
+            raise
+
+        except Exception as err:
+            logCrash(self.name, err)
+            raise
+
+    def _webhandle_getactions_GET(self):
+        """
+        Triggered when the solmanager requests the solserver for actions
+
+        Ex:
+           1. solmanager asks solserver for actions
+           2. solserver tells solmanager to update its SOL library
+        """
+
+        try:
+            # update stats
+            AppData().incrStats(STAT_NUM_JSON_REQ)
+
+            # authorize the client
+            site = self._authorizeClient()
+
+            bottle.response.content_type = 'application/json'
+            return json.dumps(solserver.get_actions(site))
+
+        except bottle.BottleException:
+            raise
+
+        except Exception as err:
+            logCrash(self.name, err)
+            raise
+    
+    # interaction with administrator
+
+    def _webhandle_echo_POST(self):
+        try:
+            # update stats
+            AppData().incrStats(STAT_NUM_JSON_REQ)
+
+            # authorize the client
+            self._authorizeClient()
+
+            bottle.response.content_type = bottle.request.content_type
+            return bottle.request.body.read()
+
+        except bottle.BottleException:
+            raise
+
+        except Exception as err:
+            logCrash(self.name, err)
+            raise
+
+    def _webhandle_status_GET(self):
+        try:
+            # update stats
+            AppData().incrStats(STAT_NUM_JSON_REQ)
+
+            # authorize the client
+            self._authorizeClient()
+
+            returnVal = {
+                'version solserver': solserver_version.VERSION,
+                'version Sol': SolVersion.VERSION,
+                'uptime computer': self._exec_cmd('uptime'),
+                'utc': int(time.time()),
+                'date': time.strftime("%a, %d %b %Y %H:%M:%S", time.gmtime()),
+                'last reboot': self._exec_cmd('last reboot'),
+                'stats': AppData().getStats()
+            }
+
+            bottle.response.content_type = 'application/json'
+            return json.dumps(returnVal)
+
+        except bottle.BottleException:
+            raise
+
+        except Exception as err:
+            logCrash(self.name, err)
+            raise
+
+    def _webhandle_setactions_POST(self, action, site, token):
+        """
+        Add an action to passively give order to the solmanager.
+        When the solmanager can't be reached by the solserver, the solmanager
+        periodically ask the server for actions.
+        """
+
+        try:
+            # update stats
+            AppData().incrStats(STAT_NUM_SET_ACTION_REQ)
+
+            # authorize the client
+            site = self._authorizeClient(token)
+
+            # format action
+            action_json = {
+                "action":   action,
+                "site":     site,
+            }
+
+            # add action to list if action is available
+            available_actions = ["update"]
+            if action in available_actions:
+                solserver.set_action(action_json)
+
+            bottle.response.content_type = 'application/json'
+            return json.dumps("Action OK")
+
+        except bottle.BottleException:
+            raise
+
+        except Exception as err:
+            logCrash(self.name, err)
+            raise
+    
+    # interaction with end user
+    
     def _webhandle_root_GET(self, filename="index.html"):
         return bottle.static_file(filename, "www")
-
-    def _cb_graph_GET(self, mac):
-        bottle.response.status = 303
-        redir_url  = "../../grafana/dashboard/db/dynamic?"
-        redir_url += "panelId=1&fullscreen&mac='{0}'".format(mac)
-        bottle.redirect(redir_url)
 
     def _webhandle_map_GET(self, sitename, filename=""):
         if filename == "":
@@ -338,7 +506,16 @@ class JsonApiThread(threading.Thread):
         else:
             return bottle.static_file(filename, "www")
 
-    def _cb_jsonp_GET(self, site, sol_type, utc_time):
+    def _webhandle_mote_GET(self, mac):
+        '''
+        Redirect to dynamic Grafana page
+        '''
+        bottle.response.status = 303
+        redir_url  = "../../grafana/dashboard/db/dynamic?"
+        redir_url += "panelId=1&fullscreen&mac='{0}'".format(mac)
+        bottle.redirect(redir_url)
+
+    def _webhandle_jsonp_GET(self, site, sol_type, utc_time):
         # clean inputs
         clean = self._check_map_query(site)
         clean = clean and self._check_map_query(sol_type)
@@ -382,170 +559,6 @@ class JsonApiThread(threading.Thread):
         if len(influx_json) > 0:
             j = self.sol.influxdb_to_json(influx_json)
         return json.dumps(j)
-
-    def _cb_getactions_GET(self):
-        """
-        Triggered when the solmanager requests the solserver for actions
-
-        Ex:
-           1. solmanager asks solserver for actions
-           2. solserver tells solmanager to update its SOL library
-        """
-
-        try:
-            # update stats
-            AppData().incrStats(STAT_NUM_JSON_REQ)
-
-            # authorize the client
-            site = self._authorizeClient()
-
-            bottle.response.content_type = 'application/json'
-            return json.dumps(solserver.get_actions(site))
-
-        except bottle.BottleException:
-            raise
-
-        except Exception as err:
-            logCrash(self.name, err)
-            raise
-
-    def _cb_setaction_POST(self, action, site, token):
-        """
-        Add an action to passively give order to the solmanager.
-        When the solmanager can't be reached by the solserver, the solmanager
-        periodically ask the server for actions.
-        """
-
-        try:
-            # update stats
-            AppData().incrStats(STAT_NUM_SET_ACTION_REQ)
-
-            # authorize the client
-            site = self._authorizeClient(token)
-
-            # format action
-            action_json = {
-                "action":   action,
-                "site":     site,
-            }
-
-            # add action to list if action is available
-            available_actions = ["update"]
-            if action in available_actions:
-                solserver.set_action(action_json)
-
-            bottle.response.content_type = 'application/json'
-            return json.dumps("Action OK")
-
-        except bottle.BottleException:
-            raise
-
-        except Exception as err:
-            logCrash(self.name, err)
-            raise
-
-    def _cb_echo_POST(self):
-        try:
-            # update stats
-            AppData().incrStats(STAT_NUM_JSON_REQ)
-
-            # authorize the client
-            self._authorizeClient()
-
-            bottle.response.content_type = bottle.request.content_type
-            return bottle.request.body.read()
-
-        except bottle.BottleException:
-            raise
-
-        except Exception as err:
-            logCrash(self.name, err)
-            raise
-
-    def _cb_status_GET(self):
-        try:
-            # update stats
-            AppData().incrStats(STAT_NUM_JSON_REQ)
-
-            # authorize the client
-            self._authorizeClient()
-
-            returnVal = {
-                'version solserver': solserver_version.VERSION,
-                'version Sol': SolVersion.VERSION,
-                'uptime computer': self._exec_cmd('uptime'),
-                'utc': int(time.time()),
-                'date': time.strftime("%a, %d %b %Y %H:%M:%S", time.gmtime()),
-                'last reboot': self._exec_cmd('last reboot'),
-                'stats': AppData().getStats()
-            }
-
-            bottle.response.content_type = 'application/json'
-            return json.dumps(returnVal)
-
-        except bottle.BottleException:
-            raise
-
-        except Exception as err:
-            logCrash(self.name, err)
-            raise
-
-    def _cb_o_PUT(self):
-        try:
-            # update stats
-            AppData().incrStats(STAT_NUM_JSON_REQ)
-
-            # authorize the client
-            authorized_site = self._authorizeClient()
-
-            # abort if malformed JSON body
-            if bottle.request.json is None:
-                raise bottle.HTTPResponse(
-                    body   = json.dumps(
-                        {'error': 'Malformed JSON body'}
-                    ),
-                    status = 400,
-                    headers= {'Content-Type': 'application/json'},
-                )
-            
-            # http->bin
-            try:
-                sol_binl = self.sol.http_to_bin(bottle.request.json)
-            except:
-                raise bottle.HTTPResponse(
-                    body   = json.dumps(
-                                {'error': 'Malformed JSON body contents'}
-                            ),
-                    status = 400,
-                    headers= {'Content-Type': 'application/json'},
-                )
-            
-            # bin->json->influxdb format, then write to put database
-            sol_influxdbl = []
-            for sol_bin in sol_binl:
-
-                # convert bin->json
-                sol_json          = self.sol.bin_to_json(sol_bin)
-
-                # convert json->influxdb
-                tags = self._get_tags(authorized_site, self._formatBuffer(sol_json["mac"]))
-                sol_influxdbl    += [self.sol.json_to_influxdb(sol_json, tags)]
-
-            # write to database
-            try:
-                self.influxClient.write_points(sol_influxdbl)
-            except:
-                AppData().incrStats(STAT_NUM_OBJECTS_DB_FAIL, 1)
-                raise
-            else:
-                AppData().incrStats(STAT_NUM_OBJECTS_DB_OK,)
-
-        except bottle.BottleException:
-            raise
-
-        except Exception as err:
-            logCrash(self.name, err)
-            raise
 
     #=== misc
 
