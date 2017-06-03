@@ -634,7 +634,8 @@ class SolServer(object):
             params                     = [],
             callback                   = self._clihandle_stats,
         )
-    
+        self.cli.start()
+
     def _clihandle_quit(self):
         time.sleep(.3)
         print "bye bye."
