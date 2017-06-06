@@ -91,7 +91,7 @@ def logCrash(err, threadName=None):
 class AppConfig(object):
     """
     Singleton which contains the configuration of the application.
-    
+
     Configuration is read once from file CONFIGFILE
     """
     _instance = None
@@ -131,7 +131,7 @@ class AppConfig(object):
 class AppStats(object):
     """
     Singleton which contains the stats of the application.
-    
+
     Stats are read once from file STATSFILE.
     """
     _instance = None
@@ -146,7 +146,7 @@ class AppStats(object):
         if self._init:
             return
         self._init      = True
-        
+
         self.dataLock   = threading.RLock()
         self.stats      = {}
         try:
@@ -165,7 +165,7 @@ class AppStats(object):
             self._backup()
 
     # ======================= public ==========================================
-    
+
     def increment(self, statName):
         self._validateStatName(statName)
         with self.dataLock:
@@ -203,7 +203,7 @@ class AppStats(object):
 #======== JSON API to receive notifications from SolManager
 
 class JsonApiThread(threading.Thread):
-    
+
     class HTTPSServer(bottle.ServerAdapter):
         def run(self, handler):
             from cheroot.wsgi import Server as WSGIServer
@@ -218,16 +218,16 @@ class JsonApiThread(threading.Thread):
                 log.info("Server started")
             finally:
                 server.stop()
-    
+
     def __init__(self):
 
         # local variables
         self.sites                = []
         self.sol                  = Sol.Sol()
         self.influxClient         = influxdb.client.InfluxDBClient(
-            host        = AppConfig().get('inlfuxdb_host'),
-            port        = AppConfig().get('inlfuxdb_port'),
-            database    = AppConfig().get('inlfuxdb_database'),
+            host        = AppConfig().get('influxdb_host'),
+            port        = AppConfig().get('influxdb_port'),
+            database    = AppConfig().get('influxdb_database'),
         )
         self.actions    = []
 
@@ -285,7 +285,7 @@ class JsonApiThread(threading.Thread):
             method      = 'GET',
             callback    = self._webhandle_jsonp_GET
         )
-        
+
         # start the thread
         threading.Thread.__init__(self)
         self.name       = 'JsonApiThread'
@@ -335,19 +335,19 @@ class JsonApiThread(threading.Thread):
     #======================== private =========================================
 
     #=== webhandlers
-    
+
     # decorator
     def _authorized_webhandler(func):
         def hidden_decorator(self):
             try:
                 # update stats
                 AppStats().increment('JSON_NUM_REQ')
-                
+
                 # authorize the client
                 siteName = self._authorizeClient(
                     token = bottle.request.headers.get('X-REALMS-Token'),
                 )
-                
+
                 # abort if not authorized
                 if not siteName:
                     return bottle.HTTPResponse(
@@ -355,7 +355,7 @@ class JsonApiThread(threading.Thread):
                         status = 401,
                         headers= {'Content-Type': 'application/json'},
                     )
-                
+
                 # abort if not valid JSON payload
                 if bottle.request.json is None:
                     return bottle.HTTPResponse(
@@ -365,10 +365,10 @@ class JsonApiThread(threading.Thread):
                         status = 400,
                         headers= {'Content-Type': 'application/json'},
                     )
-                
+
                 # retrieve the return value
                 returnVal = func(self,siteName=siteName)
-                
+
                 # send back answer
                 return bottle.HTTPResponse(
                     status  = 200,
@@ -383,23 +383,23 @@ class JsonApiThread(threading.Thread):
                     body    = json.dumps({'error': 'Unauthorized'}),
                 )
             except Exception as err:
-                
+
                 crashMsg = logCrash(err)
-                
+
                 return bottle.HTTPResponse(
                     status  = 500,
                     headers = {'Content-Type': 'application/json'},
                     body    = json.dumps(crashMsg),
                 )
-                
+
                 raise
         return hidden_decorator
-    
+
     # interaction with SolManager
-   
+
     @_authorized_webhandler
     def _webhandle_o_PUT(self,siteName=None):
-        
+
         # http->bin
         try:
             sol_binl = self.sol.http_to_bin(bottle.request.json)
@@ -431,7 +431,7 @@ class JsonApiThread(threading.Thread):
             raise
         else:
             AppStats().increment('NUM_OBJECTS_DB_OK')
-    
+
     @_authorized_webhandler
     def _webhandle_getactions_GET(self,siteName=None):
         """
@@ -441,7 +441,7 @@ class JsonApiThread(threading.Thread):
            1. solmanager asks solserver for actions
            2. solserver tells solmanager to update its SOL library
         """
-        
+
         return bottle.HTTPResponse(
             status  = 200,
             headers = {'Content-Type': 'application/json'},
@@ -530,9 +530,9 @@ class JsonApiThread(threading.Thread):
         except Exception as err:
             logCrash(err, threadName=self.name)
             raise
-    
+
     # interaction with end user
-    
+
     def _webhandle_root_GET(self, filename="index.html"):
         return bottle.static_file(filename, "www")
 
@@ -623,7 +623,7 @@ class JsonApiThread(threading.Thread):
         return '-'.join(["%.2x" %i for i in buf])
 
     def _authorizeClient(self, token=None):
-        
+
         assert token
 
         siteName             = None
@@ -696,7 +696,7 @@ class SolServer(object):
         time.sleep(.3)
         print "bye bye."
         # all threads as daemonic, will close automatically
-    
+
     def _clihandle_stats(self,params):
         stats = AppStats().get()
         output = []
