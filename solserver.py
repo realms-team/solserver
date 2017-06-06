@@ -21,7 +21,6 @@ import traceback
 import ConfigParser
 import logging.config
 import datetime
-import sites
 
 # third-party packages
 import OpenSSL
@@ -32,9 +31,8 @@ import influxdb
 import solserver_version
 from   dustCli               import DustCli
 from   solobjectlib          import Sol, \
-                                    SolVersion
-
-                                    
+                                    SolVersion, \
+                                    SolExceptions
 
 #============================ logging =========================================
 
@@ -44,28 +42,47 @@ log.setLevel(logging.DEBUG)
 
 #============================ defines =========================================
 
-CONFIGFILE                   = 'solserver.config'
+CONFIGFILE         = 'solserver.config'
+STATSFILE          = 'solserver.stats'
+
+ALLSTATS           = [
+    #== admin
+    'ADM_NUM_CRASHES',
+    #== connection to server
+    'JSON_NUM_REQ',
+    'JSON_NUM_UNAUTHORIZED',
+    #== DB
+    'DB_NUM_WRITES_OK',
+    'DB_NUM_WRITES_FAIL',
+    'NUM_SET_ACTION_REQ',
+]
 
 #============================ helpers =========================================
 
-def logCrash(threadName, err):
-    output  = []
-    output += ["============================================================="]
-    output += [time.strftime("%m/%d/%Y %H:%M:%S UTC", time.gmtime())]
-    output += [""]
-    output += ["CRASH in Thread {0}!".format(threadName)]
-    output += [""]
-    output += ["=== exception type ==="]
+def currentUtcTime():
+    return time.strftime("%a, %d %b %Y %H:%M:%S UTC", time.gmtime())
+
+def logCrash(err, threadName=None):
+    output         = []
+    output        += ["============================================================="]
+    output        += [currentUtcTime()]
+    output        += [""]
+    output        += ["CRASH"]
+    if threadName:
+        output    += ["Thread {0}!".format(threadName)]
+    output        += [""]
+    output         += ["=== exception type ==="]
     output += [str(type(err))]
     output += [""]
     output += ["=== traceback ==="]
     output += [traceback.format_exc()]
     output  = '\n'.join(output)
-    
+
     # update stats
-    AppData().incrStats(STAT_NUM_CRASHES)
-    print output
+    AppStats().increment('ADM_NUM_CRASHES')
     log.critical(output)
+    print output
+    return output
 
 #============================ classes =========================================
 
@@ -120,14 +137,6 @@ class AppStats(object):
     _instance = None
     _init     = False
 
-    ALLSTATS  = [
-        'NUM_JSON_REQ',
-        'NUM_JSON_UNAUTHORIZED',
-        'NUM_CRASHES',
-        'STAT_NUM_OBJECTS_DB_OK',
-        'STAT_NUM_OBJECTS_DB_FAIL',
-        'NUM_SET_ACTION_REQ',
-    ]
     def __new__(cls, *args, **kwargs):
         if not cls._instance:
             cls._instance = super(AppStats, cls).__new__(cls, *args, **kwargs)
@@ -154,8 +163,7 @@ class AppStats(object):
         except (EnvironmentError, EOFError) as e:
             log.info("Could not read stats file: %s", e)
             self._backup()
-    
-    
+
     # ======================= public ==========================================
     
     def increment(self, statName):
@@ -175,15 +183,15 @@ class AppStats(object):
     def get(self):
         with self.dataLock:
             stats = self.stats.copy()
-        stats['PUBFILE_BACKLOG']   = PubFileThread().getBacklogLength()
-        stats['PUBSERVER_BACKLOG'] = PubServerThread().getBacklogLength()
         return stats
 
     # ======================= private =========================================
 
     def _validateStatName(self, statName):
         if statName.startswith("NUMRX_")==False:
-            assert statName in self.ALLSTATS
+            if statName not in ALLSTATS:
+                print statName
+            assert statName in ALLSTATS
 
     def _backup(self):
         with self.dataLock:
@@ -214,6 +222,7 @@ class JsonApiThread(threading.Thread):
     def __init__(self):
 
         # local variables
+        self.sites                = []
         self.sol                  = Sol.Sol()
         self.influxClient         = influxdb.client.InfluxDBClient(
             host        = AppConfig().get('inlfuxdb_host'),
@@ -297,7 +306,7 @@ class JsonApiThread(threading.Thread):
             raise
 
         except Exception as err:
-            logCrash(self.name, err)
+            logCrash(err, threadName=self.name)
 
         log.info("JsonApiThread started")
 
@@ -327,66 +336,104 @@ class JsonApiThread(threading.Thread):
 
     #=== webhandlers
     
-    # interaction with SolManager
-
-    def _webhandle_o_PUT(self):
-        try:
-            # update stats
-            AppData().incrStats(STAT_NUM_JSON_REQ)
-
-            # authorize the client
-            authorized_site = self._authorizeClient()
-
-            # abort if malformed JSON body
-            if bottle.request.json is None:
-                raise bottle.HTTPResponse(
-                    body   = json.dumps(
-                        {'error': 'Malformed JSON body'}
-                    ),
-                    status = 400,
-                    headers= {'Content-Type': 'application/json'},
-                )
-            
-            # http->bin
+    # decorator
+    def _authorized_webhandler(func):
+        def hidden_decorator(self):
             try:
-                sol_binl = self.sol.http_to_bin(bottle.request.json)
-            except:
-                raise bottle.HTTPResponse(
-                    body   = json.dumps(
-                                {'error': 'Malformed JSON body contents'}
-                            ),
-                    status = 400,
-                    headers= {'Content-Type': 'application/json'},
+                # update stats
+                AppStats().increment('JSON_NUM_REQ')
+                
+                # authorize the client
+                siteName = self._authorizeClient(
+                    token = bottle.request.headers.get('X-REALMS-Token'),
+                )
+                
+                # abort if not authorized
+                if not siteName:
+                    return bottle.HTTPResponse(
+                        body   = json.dumps({'error': 'Unauthorized'}),
+                        status = 401,
+                        headers= {'Content-Type': 'application/json'},
+                    )
+                
+                # abort if not valid JSON payload
+                if bottle.request.json is None:
+                    return bottle.HTTPResponse(
+                        body   = json.dumps(
+                            {'error': 'Malformed JSON body'}
+                        ),
+                        status = 400,
+                        headers= {'Content-Type': 'application/json'},
+                    )
+                
+                # retrieve the return value
+                returnVal = func(self,siteName=siteName)
+                
+                # send back answer
+                return bottle.HTTPResponse(
+                    status  = 200,
+                    headers = {'Content-Type': 'application/json'},
+                    body    = json.dumps(returnVal),
                 )
 
-            # bin->json->influxdb format, then write to put database
-            sol_influxdbl = []
-            for sol_bin in sol_binl:
-
-                # convert bin->json
-                sol_json          = self.sol.bin_to_json(sol_bin)
-
-                # convert json->influxdb
-                tags = self._get_tags(authorized_site, self._formatBuffer(sol_json["mac"]))
-                sol_influxdbl    += [self.sol.json_to_influxdb(sol_json, tags)]
-
-            # write to database
-            try:
-                self.influxClient.write_points(sol_influxdbl)
-            except:
-                AppData().incrStats(STAT_NUM_OBJECTS_DB_FAIL, 1)
+            except SolExceptions.UnauthorizedError:
+                return bottle.HTTPResponse(
+                    status  = 401,
+                    headers = {'Content-Type': 'application/json'},
+                    body    = json.dumps({'error': 'Unauthorized'}),
+                )
+            except Exception as err:
+                
+                crashMsg = logCrash(err)
+                
+                return bottle.HTTPResponse(
+                    status  = 500,
+                    headers = {'Content-Type': 'application/json'},
+                    body    = json.dumps(crashMsg),
+                )
+                
                 raise
-            else:
-                AppData().incrStats(STAT_NUM_OBJECTS_DB_OK,)
+        return hidden_decorator
+    
+    # interaction with SolManager
+   
+    @_authorized_webhandler
+    def _webhandle_o_PUT(self,siteName=None):
+        
+        # http->bin
+        try:
+            sol_binl = self.sol.http_to_bin(bottle.request.json)
+        except:
+            return bottle.HTTPResponse(
+                body   = json.dumps(
+                            {'error': 'Malformed JSON body contents'}
+                        ),
+                status = 400,
+                headers= {'Content-Type': 'application/json'},
+            )
 
-        except bottle.BottleException:
+        # bin->json->influxdb format, then write to put database
+        sol_influxdbl = []
+        for sol_bin in sol_binl:
+
+            # convert bin->json
+            sol_json          = self.sol.bin_to_json(sol_bin)
+
+            # convert json->influxdb
+            tags = self._get_tags(authorized_site, self._formatBuffer(sol_json["mac"]))
+            sol_influxdbl    += [self.sol.json_to_influxdb(sol_json, tags)]
+
+        # write to database
+        try:
+            self.influxClient.write_points(sol_influxdbl)
+        except:
+            AppStats().increment('NUM_OBJECTS_DB_FAIL')
             raise
-
-        except Exception as err:
-            logCrash(self.name, err)
-            raise
-
-    def _webhandle_getactions_GET(self):
+        else:
+            AppStats().increment('NUM_OBJECTS_DB_OK')
+    
+    @_authorized_webhandler
+    def _webhandle_getactions_GET(self,siteName=None):
         """
         Triggered when the solmanager requests the solserver for actions
 
@@ -394,30 +441,19 @@ class JsonApiThread(threading.Thread):
            1. solmanager asks solserver for actions
            2. solserver tells solmanager to update its SOL library
         """
+        
+        return bottle.HTTPResponse(
+            status  = 200,
+            headers = {'Content-Type': 'application/json'},
+            body    = json.dumps(solserver.get_actions(site)),
+        )
 
-        try:
-            # update stats
-            AppData().incrStats(STAT_NUM_JSON_REQ)
-
-            # authorize the client
-            site = self._authorizeClient()
-
-            bottle.response.content_type = 'application/json'
-            return json.dumps(solserver.get_actions(site))
-
-        except bottle.BottleException:
-            raise
-
-        except Exception as err:
-            logCrash(self.name, err)
-            raise
-    
     # interaction with administrator
 
     def _webhandle_echo_POST(self):
         try:
             # update stats
-            AppData().incrStats(STAT_NUM_JSON_REQ)
+            AppStats().increment('NUM_JSON_REQ')
 
             # authorize the client
             self._authorizeClient()
@@ -429,13 +465,13 @@ class JsonApiThread(threading.Thread):
             raise
 
         except Exception as err:
-            logCrash(self.name, err)
+            logCrash(err, threadName=self.name)
             raise
 
     def _webhandle_status_GET(self):
         try:
             # update stats
-            AppData().incrStats(STAT_NUM_JSON_REQ)
+            AppStats().increment('NUM_JSON_REQ')
 
             # authorize the client
             self._authorizeClient()
@@ -447,7 +483,7 @@ class JsonApiThread(threading.Thread):
                 'utc': int(time.time()),
                 'date': time.strftime("%a, %d %b %Y %H:%M:%S", time.gmtime()),
                 'last reboot': self._exec_cmd('last reboot'),
-                'stats': AppData().getStats()
+                'stats': AppStats().get()
             }
 
             bottle.response.content_type = 'application/json'
@@ -457,7 +493,7 @@ class JsonApiThread(threading.Thread):
             raise
 
         except Exception as err:
-            logCrash(self.name, err)
+            logCrash(err, threadName=self.name)
             raise
 
     def _webhandle_setactions_POST(self, action, site, token):
@@ -469,7 +505,7 @@ class JsonApiThread(threading.Thread):
 
         try:
             # update stats
-            AppData().incrStats(STAT_NUM_SET_ACTION_REQ)
+            AppStats().increment('NUM_SET_ACTION_REQ')
 
             # authorize the client
             site = self._authorizeClient(token)
@@ -492,7 +528,7 @@ class JsonApiThread(threading.Thread):
             raise
 
         except Exception as err:
-            logCrash(self.name, err)
+            logCrash(err, threadName=self.name)
             raise
     
     # interaction with end user
@@ -586,28 +622,35 @@ class JsonApiThread(threading.Thread):
         """
         return '-'.join(["%.2x" %i for i in buf])
 
-    def _authorizeClient(self, token=None, site_name=None):
-        token_match = False
-        if token is None:
-            token   = bottle.request.headers.get('X-REALMS-Token')
+    def _authorizeClient(self, token=None):
+        
+        assert token
 
-        for site in sites.SITES:
-            if site_name is not None and site_name != site["name"]:
-                continue
-            if token == site["token"]:
-                token_match = True
-                site_name = site["name"]
+        siteName             = None
+        searchAfterReload    = False
+        while True:
+            for site in self.sites:
+                if site['token']==token:
+                    siteName = site["name"]
+                    break
+            if (not siteName) and (searchAfterReload==False):
+                with open('SolServer.sites','r') as f:
+                    jsonSites = f.read()
+                    #jsonSites.replace('\n',' ')
+                    #jsonSites.replace('\r','')
+                print '=============== jsonSites'
+                print jsonSites
+                self.sites = json.loads(jsonSites)
+                print '=============== sites'
+                print self.sites
+                searchAfterReload = True
+            else:
+                break
 
-        if not token_match:
-            AppData().incrStats(STAT_NUM_JSON_UNAUTHORIZED)
-            log.warn("Unauthorized - Invalid Token: %s", token)
-            raise bottle.HTTPResponse(
-                body   = json.dumps({'error': 'Unauthorized'}),
-                status = 401,
-                headers= {'Content-Type': 'application/json'},
-            )
-        else:
-            return site_name
+        if not siteName:
+            AppStats().increment('JSON_NUM_UNAUTHORIZED')
+
+        return siteName
 
     def _exec_cmd(self, cmd):
         returnVal = None
@@ -655,7 +698,7 @@ class SolServer(object):
         # all threads as daemonic, will close automatically
     
     def _clihandle_stats(self,params):
-        stats = AppData().getStats()
+        stats = AppStats().get()
         output = []
         for k in sorted(stats.keys()):
             output += ['{0:<30}: {1}'.format(k, stats[k])]
