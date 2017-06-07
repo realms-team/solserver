@@ -55,6 +55,8 @@ ALLSTATS           = [
     'DB_NUM_WRITES_OK',
     'DB_NUM_WRITES_FAIL',
     'NUM_SET_ACTION_REQ',
+    'NUM_OBJECTS_DB_FAIL',
+    'NUM_OBJECTS_DB_OK',
 ]
 
 #============================ helpers =========================================
@@ -398,7 +400,7 @@ class JsonApiThread(threading.Thread):
     # interaction with SolManager
 
     @_authorized_webhandler
-    def _webhandle_o_PUT(self,siteName=None):
+    def _webhandle_o_PUT(self, siteName=None):
 
         # http->bin
         try:
@@ -420,7 +422,7 @@ class JsonApiThread(threading.Thread):
             sol_json          = self.sol.bin_to_json(sol_bin)
 
             # convert json->influxdb
-            tags = self._get_tags(authorized_site, self._formatBuffer(sol_json["mac"]))
+            tags = self._get_tags(siteName, self._formatBuffer(sol_json["mac"]))
             sol_influxdbl    += [self.sol.json_to_influxdb(sol_json, tags)]
 
         # write to database
@@ -433,7 +435,7 @@ class JsonApiThread(threading.Thread):
             AppStats().increment('NUM_OBJECTS_DB_OK')
 
     @_authorized_webhandler
-    def _webhandle_getactions_GET(self,siteName=None):
+    def _webhandle_getactions_GET(self, siteName=None):
         """
         Triggered when the solmanager requests the solserver for actions
 
@@ -445,7 +447,7 @@ class JsonApiThread(threading.Thread):
         return bottle.HTTPResponse(
             status  = 200,
             headers = {'Content-Type': 'application/json'},
-            body    = json.dumps(solserver.get_actions(site)),
+            body    = json.dumps(self.get_actions(siteName)),
         )
 
     # interaction with administrator
@@ -519,7 +521,7 @@ class JsonApiThread(threading.Thread):
             # add action to list if action is available
             available_actions = ["update"]
             if action in available_actions:
-                solserver.set_action(action_json)
+                self.set_action(action_json)
 
             bottle.response.content_type = 'application/json'
             return json.dumps("Action OK")
@@ -598,8 +600,7 @@ class JsonApiThread(threading.Thread):
 
     #=== misc
 
-    @staticmethod
-    def _get_tags(site_name, mac):
+    def _get_tags(self, site_name, mac):
         """
         :param str mac : a dash-separated mac address
         :return: the tags associated to the given mac address
@@ -607,7 +608,7 @@ class JsonApiThread(threading.Thread):
         Notes: tags are read from 'site.py' file
         """
         return_tags = {"mac": mac}  # default tag is only mac
-        for site in sites.SITES:
+        for site in self.sites:
             if site["name"] == site_name:
                 for key, tags in site["motes"].iteritems():
                     if mac == key:
@@ -635,14 +636,7 @@ class JsonApiThread(threading.Thread):
                     break
             if (not siteName) and (searchAfterReload==False):
                 with open('SolServer.sites','r') as f:
-                    jsonSites = f.read()
-                    #jsonSites.replace('\n',' ')
-                    #jsonSites.replace('\r','')
-                print '=============== jsonSites'
-                print jsonSites
-                self.sites = json.loads(jsonSites)
-                print '=============== sites'
-                print self.sites
+                    self.sites = json.load(f)["sites"]
                 searchAfterReload = True
             else:
                 break
