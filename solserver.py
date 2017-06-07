@@ -635,7 +635,7 @@ class JsonApiThread(threading.Thread):
                     siteName = site["name"]
                     break
             if (not siteName) and (searchAfterReload==False):
-                with open('SolServer.sites','r') as f:
+                with open('solserver.sites','r') as f:
                     self.sites = json.load(f)["sites"]
                 searchAfterReload = True
             else:
