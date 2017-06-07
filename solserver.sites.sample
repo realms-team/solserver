@@ -1,7 +1,9 @@
-[   
+{ "sites" : [
     {
         "name"  : "local",
         "token" : "SOLSERVER_TOKEN_LOCAL",
+        "motes" : {
+        }
     },
     {
         "name"  : "site_sample",
@@ -9,20 +11,20 @@
         "motes" : {
             "00-17-0d-00-00-38-00-63" : {
                 "latitude"  : -33.11456,
-                "longitude" : -68.48035,
+                "longitude" : -68.48035
             },
             "00-17-0d-00-00-30-60-ef" : {
                 "latitude"  : -33.11456,
-                "longitude" : -68.48035,
+                "longitude" : -68.48035
             },
             "00-17-0d-00-00-3f-f8-20" : {
                 "latitude"  : -33.11464,
-                "longitude" : -68.48028,
+                "longitude" : -68.48028
             },
             "00-17-0d-00-00-58-32-36" : {
                 "latitude"  : -33.11464,
-                "longitude" : -68.48015,
-            },
-        },
-    },
-]
+                "longitude" : -68.48015
+            }
+        }
+    }
+]}
