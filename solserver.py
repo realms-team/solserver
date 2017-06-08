@@ -219,14 +219,17 @@ class JsonApiThread(threading.Thread):
                     )
 
                 # abort if not valid JSON payload
-                if bottle.request.json is None:
-                    return bottle.HTTPResponse(
-                        body   = json.dumps(
-                            {'error': 'Malformed JSON body'}
-                        ),
-                        status = 400,
-                        headers= {'Content-Type': 'application/json'},
-                    )
+                if bottle.request.json is not None:
+                    try:
+                        json.loads(bottle.request.json)
+                    except ValueError:
+                        return bottle.HTTPResponse(
+                            body   = json.dumps(
+                                {'error': 'Malformed JSON body'}
+                            ),
+                            status = 400,
+                            headers= {'Content-Type': 'application/json'},
+                        )
 
                 # retrieve the return value
                 returnVal = func(self, siteName=siteName)
@@ -259,6 +262,16 @@ class JsonApiThread(threading.Thread):
 
     @_authorized_webhandler
     def _webhandle_o_PUT(self, siteName=None):
+
+        # abort if not  JSON payload
+        if bottle.request.json is None:
+            return bottle.HTTPResponse(
+                body=json.dumps(
+                    {'error': 'JSON body is required'}
+                ),
+                status=400,
+                headers={'Content-Type': 'application/json'},
+            )
 
         # http->bin
         try:
@@ -302,11 +315,7 @@ class JsonApiThread(threading.Thread):
            2. solserver tells solmanager to update its SOL library
         """
 
-        return bottle.HTTPResponse(
-            status  = 200,
-            headers = {'Content-Type': 'application/json'},
-            body    = json.dumps(self.get_actions(siteName)),
-        )
+        return self.get_actions(siteName)
 
     # interaction with administrator
 
