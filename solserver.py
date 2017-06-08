@@ -32,7 +32,8 @@ import solserver_version
 from   dustCli               import DustCli
 from   solobjectlib          import Sol, \
                                     SolVersion, \
-                                    SolExceptions
+                                    SolExceptions,\
+                                    SolUtils
 
 #============================ logging =========================================
 
@@ -60,31 +61,6 @@ ALLSTATS           = [
 ]
 
 #============================ helpers =========================================
-
-def currentUtcTime():
-    return time.strftime("%a, %d %b %Y %H:%M:%S UTC", time.gmtime())
-
-def logCrash(err, threadName=None):
-    output         = []
-    output        += ["============================================================="]
-    output        += [currentUtcTime()]
-    output        += [""]
-    output        += ["CRASH"]
-    if threadName:
-        output    += ["Thread {0}!".format(threadName)]
-    output        += [""]
-    output         += ["=== exception type ==="]
-    output += [str(type(err))]
-    output += [""]
-    output += ["=== traceback ==="]
-    output += [traceback.format_exc()]
-    output  = '\n'.join(output)
-
-    # update stats
-    AppStats().increment('ADM_NUM_CRASHES')
-    log.critical(output)
-    print output
-    return output
 
 #============================ classes =========================================
 
@@ -308,7 +284,7 @@ class JsonApiThread(threading.Thread):
             raise
 
         except Exception as err:
-            logCrash(err, threadName=self.name)
+            SolUtils.logCrash(err, AppStats(), threadName=self.name)
 
         log.info("JsonApiThread started")
 
@@ -386,7 +362,7 @@ class JsonApiThread(threading.Thread):
                 )
             except Exception as err:
 
-                crashMsg = logCrash(err)
+                crashMsg = SolUtils.logCrash(err, AppStats())
 
                 return bottle.HTTPResponse(
                     status  = 500,
@@ -467,7 +443,7 @@ class JsonApiThread(threading.Thread):
             raise
 
         except Exception as err:
-            logCrash(err, threadName=self.name)
+            SolUtils.logCrash(err, AppStats(), threadName=self.name)
             raise
 
     def _webhandle_status_GET(self):
@@ -495,7 +471,7 @@ class JsonApiThread(threading.Thread):
             raise
 
         except Exception as err:
-            logCrash(err, threadName=self.name)
+            SolUtils.logCrash(err, AppStats(), threadName=self.name)
             raise
 
     def _webhandle_setactions_POST(self, action, site, token):
@@ -530,7 +506,7 @@ class JsonApiThread(threading.Thread):
             raise
 
         except Exception as err:
-            logCrash(err, threadName=self.name)
+            SolUtils.logCrash(err, AppStats(), threadName=self.name)
             raise
 
     # interaction with end user
