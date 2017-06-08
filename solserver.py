@@ -8,7 +8,7 @@ import os
 if __name__ == "__main__":
     here = sys.path[0]
     sys.path.insert(0, os.path.join(here, '..', 'sol'))
-    sys.path.insert(0, os.path.join(here, '..', 'smartmeshsdk','libs'))
+    sys.path.insert(0, os.path.join(here, '..', 'smartmeshsdk', 'libs'))
 
 # =========================== imports =========================================
 
@@ -17,7 +17,6 @@ import time
 import json
 import subprocess
 import threading
-import ConfigParser
 import logging.config
 import datetime
 
@@ -63,6 +62,7 @@ ALLSTATS           = [
 #============================ classes =========================================
 
 #======== JSON API to receive notifications from SolManager
+
 
 class JsonApiThread(threading.Thread):
 
@@ -229,7 +229,7 @@ class JsonApiThread(threading.Thread):
                     )
 
                 # retrieve the return value
-                returnVal = func(self,siteName=siteName)
+                returnVal = func(self, siteName=siteName)
 
                 # send back answer
                 return bottle.HTTPResponse(
@@ -253,8 +253,6 @@ class JsonApiThread(threading.Thread):
                     headers = {'Content-Type': 'application/json'},
                     body    = json.dumps(crashMsg),
                 )
-
-                raise
         return hidden_decorator
 
     # interaction with SolManager
@@ -405,9 +403,9 @@ class JsonApiThread(threading.Thread):
             return bottle.static_file(filename, "www")
 
     def _webhandle_mote_GET(self, mac):
-        '''
+        """
         Redirect to dynamic Grafana page
-        '''
+        """
         bottle.response.status = 303
         redir_url  = "../../grafana/dashboard/db/dynamic?"
         redir_url += "panelId=1&fullscreen&mac='{0}'".format(mac)
@@ -481,7 +479,7 @@ class JsonApiThread(threading.Thread):
         """
         example: [0x11,0x22,0x33,0x44,0x55,0x66,0x77,0x88] -> "11-22-33-44-55-66-77-88"
         """
-        return '-'.join(["%.2x" %i for i in buf])
+        return '-'.join(["%.2x" % i for i in buf])
 
     def _authorizeClient(self, token=None):
 
@@ -491,11 +489,11 @@ class JsonApiThread(threading.Thread):
         searchAfterReload    = False
         while True:
             for site in self.sites:
-                if site['token']==token:
+                if site['token'] == token:
                     siteName = site["name"]
                     break
-            if (not siteName) and (searchAfterReload==False):
-                with open('solserver.sites','r') as f:
+            if (not siteName) and (searchAfterReload == False):
+                with open('solserver.sites', 'r') as f:
                     self.sites = json.load(f)["sites"]
                 searchAfterReload = True
             else:
@@ -528,6 +526,7 @@ class JsonApiThread(threading.Thread):
 
 #======== main application thread
 
+
 class SolServer(object):
 
     def __init__(self):
@@ -540,7 +539,7 @@ class SolServer(object):
         self.jsonApiThread  = JsonApiThread()
 
         # CLI interface
-        self.cli            = DustCli.DustCli("SolServer",self._clihandle_quit)
+        self.cli            = DustCli.DustCli("SolServer", self._clihandle_quit)
         self.cli.registerCommand(
             name                       = 'stats',
             alias                      = 's',
@@ -555,7 +554,7 @@ class SolServer(object):
         print "bye bye."
         # all threads as daemonic, will close automatically
 
-    def _clihandle_stats(self,params):
+    def _clihandle_stats(self, params):
         stats = SolUtils.AppStats().get()
         output = []
         for k in sorted(stats.keys()):
@@ -564,6 +563,7 @@ class SolServer(object):
         print output
 
 #============================ main ============================================
+
 
 def main():
     solServer = SolServer()
