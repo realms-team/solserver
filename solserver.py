@@ -55,6 +55,7 @@ ALLSTATS           = [
     'NUM_SET_ACTION_REQ',
     'NUM_OBJECTS_DB_FAIL',
     'NUM_OBJECTS_DB_OK',
+    'NUM_JSON_REQ',
 ]
 
 #============================ helpers =========================================
@@ -118,7 +119,7 @@ class JsonApiThread(threading.Thread):
             callback    = self._webhandle_status_GET,
         )
         self.web.route(
-            path        = '/api/v1/setaction/<action>/site/<site>/token/<token>',
+            path        = '/api/v1/setaction/',
             method      = 'POST',
             callback    = self._webhandle_setactions_POST,
         )
@@ -221,7 +222,7 @@ class JsonApiThread(threading.Thread):
                 # abort if not valid JSON payload
                 if bottle.request.json is not None:
                     try:
-                        json.loads(bottle.request.json)
+                        json.dumps(bottle.request.json)
                     except ValueError:
                         return bottle.HTTPResponse(
                             body   = json.dumps(
@@ -319,86 +320,44 @@ class JsonApiThread(threading.Thread):
 
     # interaction with administrator
 
-    def _webhandle_echo_POST(self):
-        try:
-            # update stats
-            SolUtils.AppStats().increment('NUM_JSON_REQ')
+    @_authorized_webhandler
+    def _webhandle_echo_POST(self, siteName=None):
 
-            # authorize the client
-            self._authorizeClient()
+        return bottle.request.body.read()
 
-            bottle.response.content_type = bottle.request.content_type
-            return bottle.request.body.read()
-
-        except bottle.BottleException:
-            raise
-
-        except Exception as err:
-            SolUtils.logCrash(err, SolUtils.AppStats(), threadName=self.name)
-            raise
-
-    def _webhandle_status_GET(self):
-        try:
-            # update stats
-            SolUtils.AppStats().increment('NUM_JSON_REQ')
-
-            # authorize the client
-            self._authorizeClient()
-
-            returnVal = {
+    @_authorized_webhandler
+    def _webhandle_status_GET(self, siteName=None):
+        return {
                 'version solserver': solserver_version.VERSION,
                 'version Sol': SolVersion.VERSION,
                 'uptime computer': self._exec_cmd('uptime'),
                 'utc': int(time.time()),
                 'date': time.strftime("%a, %d %b %Y %H:%M:%S", time.gmtime()),
-                'last reboot': self._exec_cmd('last reboot'),
+                #'last reboot': self._exec_cmd('last reboot'),  # TODO not working anymore
                 'stats': SolUtils.AppStats().get()
-            }
+        }
 
-            bottle.response.content_type = 'application/json'
-            return json.dumps(returnVal)
-
-        except bottle.BottleException:
-            raise
-
-        except Exception as err:
-            SolUtils.logCrash(err, SolUtils.AppStats(), threadName=self.name)
-            raise
-
-    def _webhandle_setactions_POST(self, action, site, token):
+    @_authorized_webhandler
+    def _webhandle_setactions_POST(self, siteName=None):
         """
         Add an action to passively give order to the solmanager.
         When the solmanager can't be reached by the solserver, the solmanager
         periodically ask the server for actions.
         """
 
-        try:
-            # update stats
-            SolUtils.AppStats().increment('NUM_SET_ACTION_REQ')
+        # format action
+        action_json = {
+            "action":   bottle.request.json["action"],
+            "site":     bottle.request.json["site"],
+        }
 
-            # authorize the client
-            site = self._authorizeClient(token)
+        # add action to list if action is available
+        available_actions = ["update"]
+        if bottle.request.json["action"] in available_actions:
+            self.set_action(action_json)
 
-            # format action
-            action_json = {
-                "action":   action,
-                "site":     site,
-            }
+        return "Action OK"
 
-            # add action to list if action is available
-            available_actions = ["update"]
-            if action in available_actions:
-                self.set_action(action_json)
-
-            bottle.response.content_type = 'application/json'
-            return json.dumps("Action OK")
-
-        except bottle.BottleException:
-            raise
-
-        except Exception as err:
-            SolUtils.logCrash(err, SolUtils.AppStats(), threadName=self.name)
-            raise
 
     # interaction with end user
 

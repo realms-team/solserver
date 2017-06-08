@@ -46,7 +46,15 @@ function set_sites(data){
 // Tell the server to start the update process
 function start_update(self,site_name){
     var token = prompt("Please give site token","");
-    var jqxhr = $.post("api/v1/setaction/update/site/"+site_name+"/token/"+token);
+    var jqxhr = $.ajax({
+                        url :"api/v1/setaction/",
+                        type:"POST",
+                        headers: { "X-REALMS-Token": token },
+                        data: JSON.stringify({ "action": "update",
+                               "site": site_name
+                               }),
+                        contentType:"application/json"
+                    });
     jqxhr.done(function() {
         $("#feedback").append("> Update started for site "+site_name+"<br>");
     })
