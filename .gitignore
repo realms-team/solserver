@@ -1,9 +1,10 @@
 *.pyc
-/sites.py
+/solserver.sites
 /solserver.backup
 /solserver.config
 /solserver.cert
 /solserver.ppk
 /solserver.crashlog
+/solserver.stats
 /solmanager.cert
 *.log
