@@ -1,8 +1,4 @@
-[solmanager]
-# security
-token         = DEFAULT_SOLMANAGERTOKEN
-
-[solserver]
+[config]
 # connection
 tcpport       = 8081
 host          = 0.0.0.0

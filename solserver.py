@@ -62,120 +62,6 @@ ALLSTATS           = [
 
 #============================ classes =========================================
 
-#======== singletons
-
-class AppConfig(object):
-    """
-    Singleton which contains the configuration of the application.
-
-    Configuration is read once from file CONFIGFILE
-    """
-    _instance = None
-    _init     = False
-
-    def __new__(cls, *args, **kwargs):
-        if not cls._instance:
-            cls._instance = super(AppConfig, cls).__new__(cls, *args, **kwargs)
-        return cls._instance
-
-    def __init__(self):
-        if self._init:
-            return
-        self._init = True
-
-        # local variables
-        self.dataLock   = threading.RLock()
-        self.config     = {}
-
-        config          = ConfigParser.ConfigParser()
-        config.read(CONFIGFILE)
-
-        with self.dataLock:
-            for (k,v) in config.items('solserver'):
-                try:
-                    self.config[k] = float(v)
-                except ValueError:
-                    try:
-                        self.config[k] = int(v)
-                    except ValueError:
-                        self.config[k] = v
-
-    def get(self,name):
-        with self.dataLock:
-            return self.config[name]
-
-class AppStats(object):
-    """
-    Singleton which contains the stats of the application.
-
-    Stats are read once from file STATSFILE.
-    """
-    _instance = None
-    _init     = False
-
-    def __new__(cls, *args, **kwargs):
-        if not cls._instance:
-            cls._instance = super(AppStats, cls).__new__(cls, *args, **kwargs)
-        return cls._instance
-
-    def __init__(self):
-        if self._init:
-            return
-        self._init      = True
-
-        self.dataLock   = threading.RLock()
-        self.stats      = {}
-        try:
-            with open(STATSFILE, 'r') as f:
-                for line in f:
-                    k        = line.split('=')[0].strip()
-                    v        = line.split('=')[1].strip()
-                    try:
-                        v    = int(v)
-                    except ValueError:
-                        pass
-                    self.stats[k] = v
-                log.info("Stats recovered from file.")
-        except (EnvironmentError, EOFError) as e:
-            log.info("Could not read stats file: %s", e)
-            self._backup()
-
-    # ======================= public ==========================================
-
-    def increment(self, statName):
-        self._validateStatName(statName)
-        with self.dataLock:
-            if statName not in self.stats:
-                self.stats[statName] = 0
-            self.stats[statName] += 1
-        self._backup()
-
-    def update(self, k, v):
-        self._validateStatName(k)
-        with self.dataLock:
-            self.stats[k] = v
-        self._backup()
-
-    def get(self):
-        with self.dataLock:
-            stats = self.stats.copy()
-        return stats
-
-    # ======================= private =========================================
-
-    def _validateStatName(self, statName):
-        if statName.startswith("NUMRX_")==False:
-            if statName not in ALLSTATS:
-                print statName
-            assert statName in ALLSTATS
-
-    def _backup(self):
-        with self.dataLock:
-            output = ['{0} = {1}'.format(k,v) for (k,v) in self.stats.items()]
-            output = '\n'.join(output)
-            with open(STATSFILE, 'w') as f:
-                f.write(output)
-
 #======== JSON API to receive notifications from SolManager
 
 class JsonApiThread(threading.Thread):
@@ -186,8 +72,8 @@ class JsonApiThread(threading.Thread):
             from cheroot.ssl.pyopenssl import pyOpenSSLAdapter
             server = WSGIServer((self.host, self.port), handler)
             server.ssl_adapter = pyOpenSSLAdapter(
-                certificate = AppConfig().get('solserver_certificate'),
-                private_key = AppConfig().get('solserver_private_key'),
+                certificate = SolUtils.AppConfig().get('solserver_certificate'),
+                private_key = SolUtils.AppConfig().get('solserver_private_key'),
             )
             try:
                 server.start()
@@ -201,9 +87,9 @@ class JsonApiThread(threading.Thread):
         self.sites                = []
         self.sol                  = Sol.Sol()
         self.influxClient         = influxdb.client.InfluxDBClient(
-            host        = AppConfig().get('influxdb_host'),
-            port        = AppConfig().get('influxdb_port'),
-            database    = AppConfig().get('influxdb_database'),
+            host        = SolUtils.AppConfig().get('influxdb_host'),
+            port        = SolUtils.AppConfig().get('influxdb_port'),
+            database    = SolUtils.AppConfig().get('influxdb_database'),
         )
         self.actions    = []
 
@@ -272,7 +158,7 @@ class JsonApiThread(threading.Thread):
         try:
             self.web.run(
                 host   = '0.0.0.0',
-                port   = AppConfig().get('solserver_tcpport'),
+                port   = SolUtils.AppConfig().get('solserver_tcpport'),
                 server = self.HTTPSServer,
                 quiet  = True,
                 debug  = False,
@@ -282,7 +168,7 @@ class JsonApiThread(threading.Thread):
             raise
 
         except Exception as err:
-            SolUtils.logCrash(err, AppStats(), threadName=self.name)
+            SolUtils.logCrash(err, SolUtils.AppStats(), threadName=self.name)
 
         log.info("JsonApiThread started")
 
@@ -317,7 +203,7 @@ class JsonApiThread(threading.Thread):
         def hidden_decorator(self):
             try:
                 # update stats
-                AppStats().increment('JSON_NUM_REQ')
+                SolUtils.AppStats().increment('JSON_NUM_REQ')
 
                 # authorize the client
                 siteName = self._authorizeClient(
@@ -360,7 +246,7 @@ class JsonApiThread(threading.Thread):
                 )
             except Exception as err:
 
-                crashMsg = SolUtils.logCrash(err, AppStats())
+                crashMsg = SolUtils.logCrash(err, SolUtils.AppStats())
 
                 return bottle.HTTPResponse(
                     status  = 500,
@@ -403,10 +289,10 @@ class JsonApiThread(threading.Thread):
         try:
             self.influxClient.write_points(sol_influxdbl)
         except:
-            AppStats().increment('NUM_OBJECTS_DB_FAIL')
+            SolUtils.AppStats().increment('NUM_OBJECTS_DB_FAIL')
             raise
         else:
-            AppStats().increment('NUM_OBJECTS_DB_OK')
+            SolUtils.AppStats().increment('NUM_OBJECTS_DB_OK')
 
     @_authorized_webhandler
     def _webhandle_getactions_GET(self, siteName=None):
@@ -429,7 +315,7 @@ class JsonApiThread(threading.Thread):
     def _webhandle_echo_POST(self):
         try:
             # update stats
-            AppStats().increment('NUM_JSON_REQ')
+            SolUtils.AppStats().increment('NUM_JSON_REQ')
 
             # authorize the client
             self._authorizeClient()
@@ -441,13 +327,13 @@ class JsonApiThread(threading.Thread):
             raise
 
         except Exception as err:
-            SolUtils.logCrash(err, AppStats(), threadName=self.name)
+            SolUtils.logCrash(err, SolUtils.AppStats(), threadName=self.name)
             raise
 
     def _webhandle_status_GET(self):
         try:
             # update stats
-            AppStats().increment('NUM_JSON_REQ')
+            SolUtils.AppStats().increment('NUM_JSON_REQ')
 
             # authorize the client
             self._authorizeClient()
@@ -459,7 +345,7 @@ class JsonApiThread(threading.Thread):
                 'utc': int(time.time()),
                 'date': time.strftime("%a, %d %b %Y %H:%M:%S", time.gmtime()),
                 'last reboot': self._exec_cmd('last reboot'),
-                'stats': AppStats().get()
+                'stats': SolUtils.AppStats().get()
             }
 
             bottle.response.content_type = 'application/json'
@@ -469,7 +355,7 @@ class JsonApiThread(threading.Thread):
             raise
 
         except Exception as err:
-            SolUtils.logCrash(err, AppStats(), threadName=self.name)
+            SolUtils.logCrash(err, SolUtils.AppStats(), threadName=self.name)
             raise
 
     def _webhandle_setactions_POST(self, action, site, token):
@@ -481,7 +367,7 @@ class JsonApiThread(threading.Thread):
 
         try:
             # update stats
-            AppStats().increment('NUM_SET_ACTION_REQ')
+            SolUtils.AppStats().increment('NUM_SET_ACTION_REQ')
 
             # authorize the client
             site = self._authorizeClient(token)
@@ -504,7 +390,7 @@ class JsonApiThread(threading.Thread):
             raise
 
         except Exception as err:
-            SolUtils.logCrash(err, AppStats(), threadName=self.name)
+            SolUtils.logCrash(err, SolUtils.AppStats(), threadName=self.name)
             raise
 
     # interaction with end user
@@ -616,7 +502,7 @@ class JsonApiThread(threading.Thread):
                 break
 
         if not siteName:
-            AppStats().increment('JSON_NUM_UNAUTHORIZED')
+            SolUtils.AppStats().increment('JSON_NUM_UNAUTHORIZED')
 
         return siteName
 
@@ -646,6 +532,10 @@ class SolServer(object):
 
     def __init__(self):
 
+        # init Singletons -- must be first init
+        SolUtils.AppConfig(config_file=CONFIGFILE)
+        SolUtils.AppStats(stats_file=STATSFILE, stats_list=ALLSTATS)
+
         # API thread
         self.jsonApiThread  = JsonApiThread()
 
@@ -666,7 +556,7 @@ class SolServer(object):
         # all threads as daemonic, will close automatically
 
     def _clihandle_stats(self,params):
-        stats = AppStats().get()
+        stats = SolUtils.AppStats().get()
         output = []
         for k in sorted(stats.keys()):
             output += ['{0:<30}: {1}'.format(k, stats[k])]
