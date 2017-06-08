@@ -17,13 +17,11 @@ import time
 import json
 import subprocess
 import threading
-import traceback
 import ConfigParser
 import logging.config
 import datetime
 
 # third-party packages
-import OpenSSL
 import bottle
 import influxdb
 
