@@ -11,3 +11,8 @@ privatekey    = solserver.ppk
 # files
 crashlogfile  = solserver.crashlog
 backupfile    = solserver.backup
+
+# influxdb
+influxdb_host = localhost
+influxdb_port = 8086
+influxdb_database = realms
