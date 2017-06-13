@@ -26,6 +26,7 @@ import influxdb
 
 # project-specific
 import solserver_version
+from   SmartMeshSDK.utils    import FormatUtils
 from   dustCli               import DustCli
 from   solobjectlib          import Sol, \
                                     SolVersion, \
@@ -294,7 +295,7 @@ class JsonApiThread(threading.Thread):
             sol_json          = self.sol.bin_to_json(sol_bin)
 
             # convert json->influxdb
-            tags = self._get_tags(siteName, self._formatBuffer(sol_json["mac"]))
+            tags = self._get_tags(siteName, FormatUtils.formatBuffer(sol_json["mac"]))
             sol_influxdbl    += [self.sol.json_to_influxdb(sol_json, tags)]
 
         # write to database
@@ -441,13 +442,6 @@ class JsonApiThread(threading.Thread):
                         return_tags.update(tags)
                         return_tags["site"] = site["name"]
         return return_tags
-
-    @staticmethod
-    def _formatBuffer(buf):
-        """
-        example: [0x11,0x22,0x33,0x44,0x55,0x66,0x77,0x88] -> "11-22-33-44-55-66-77-88"
-        """
-        return '-'.join(["%.2x" % i for i in buf])
 
     def _authorizeClient(self, token=None):
 
