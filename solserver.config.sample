@@ -1,17 +1,19 @@
-[solmanager]
-# security
-token         = DEFAULT_SOLMANAGERTOKEN
-
-[solserver]
+[config]
 # connection
-tcpport       = 8081
+solserver_tcpport = 8082
 host          = 0.0.0.0
 
 # security
-token         = DEFAULT_SOLSERVERTOKEN
-certfile      = solserver.cert
-privatekey    = solserver.ppk
+token                   = DEFAULT_SOLSERVERTOKEN
+solserver_certificate   = solserver.cert
+solserver_private_key   = solserver.ppk
 
 # files
 crashlogfile  = solserver.crashlog
 backupfile    = solserver.backup
+
+# influxdb
+influxdb_host = localhost
+influxdb_port = 8086
+influxdb_database = realms
+
