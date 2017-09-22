@@ -340,7 +340,7 @@ class JsonApiThread(threading.Thread):
             sol_json          = self.sol.bin_to_json(sol_bin)
 
             # convert json->influxdb
-            tags = self._get_tags(siteName, FormatUtils.formatBuffer(sol_json["mac"]))
+            tags = self._get_tags(siteName, sol_json["mac"])
             sol_influxdbl    += [self.sol.json_to_influxdb(sol_json, tags)]
 
         # write to database
