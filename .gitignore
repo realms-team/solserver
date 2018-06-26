@@ -8,3 +8,4 @@
 /solserver.stats
 /solmanager.cert
 *.log
+.idea/
