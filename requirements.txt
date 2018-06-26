@@ -2,5 +2,4 @@ cherrypy>=10.2.1
 pyopenssl>=17.0.0
 bottle>=0.12.13
 influxdb>=4.1.0
-flatdict>=1.2.0
 sensorobjectlibrary>=1.7.1.0
