@@ -7,7 +7,6 @@ import os
 
 if __name__ == "__main__":
     here = sys.path[0]
-    sys.path.insert(0, os.path.join(here, '..', 'sol'))
     sys.path.insert(0, os.path.join(here, '..', 'smartmeshsdk', 'libs'))
 
 # =========================== imports =========================================
@@ -18,7 +17,6 @@ import json
 import subprocess
 import threading
 import logging.config
-import datetime
 
 # third-party packages
 import bottle
@@ -26,10 +24,8 @@ import influxdb
 
 # project-specific
 import solserver_version
-from   SmartMeshSDK.utils    import FormatUtils
 from   dustCli               import DustCli
-from   solobjectlib          import Sol, \
-                                    SolVersion, \
+from   sensorobjectlibrary   import Sol as sol, \
                                     SolExceptions,\
                                     SolUtils
 
@@ -87,7 +83,6 @@ class JsonApiThread(threading.Thread):
 
         # local variables
         self.sites                = []
-        self.sol                  = Sol.Sol()
         self.influxClient         = influxdb.client.InfluxDBClient(
             host        = SolUtils.AppConfig().get('influxdb_host'),
             port        = SolUtils.AppConfig().get('influxdb_port'),
@@ -123,31 +118,6 @@ class JsonApiThread(threading.Thread):
             path        = '/api/v1/setaction/',
             method      = 'POST',
             callback    = self._webhandle_setactions_POST,
-        )
-        # interaction with end user
-        self.web.route(
-            path        = "/<filename>",
-            method      = 'GET',
-            callback    = self._webhandle_root_GET,
-        )
-        self.web.route(
-            path        = [
-                '/map/<sitename>/<filename>',
-                '/map/<sitename>/',
-                '/map/<sitename>',
-            ],
-            method      = 'GET',
-            callback    = self._webhandle_map_GET,
-        )
-        self.web.route(
-            path        = '/mote/<mac>/',
-            method      = 'GET',
-            callback    = self._webhandle_mote_GET,
-        )
-        self.web.route(
-            path        = '/api/v1/jsonp/<site>/<sol_type>/time/<utc_time>',
-            method      = 'GET',
-            callback    = self._webhandle_jsonp_GET
         )
 
         # start the thread
@@ -199,51 +169,6 @@ class JsonApiThread(threading.Thread):
     #======================== private =========================================
 
     #=== webhandlers
-
-    def _cb_jsonp_GET(self, site, sol_type, utc_time):
-        # clean inputs
-        clean = self._check_map_query(site)
-        clean = clean and self._check_map_query(sol_type)
-        clean = clean and self._check_map_query(utc_time)
-        if not clean :
-            return "Wrong parameters"
-
-        # build InfluxDB query
-        query = "SELECT * FROM " + sol_type
-        if site != "all":
-            query = query + " WHERE site = '" + site + "'"
-        else:
-            # select all sites
-            query = query + " WHERE site =~ //"
-        if sol_type == "SOL_TYPE_DUST_NOTIF_HRNEIGHBORS":
-            # compute time - 16min
-            start_time = datetime.datetime.strptime(
-                        utc_time, '%Y-%m-%dT%H:%M:%S.%fZ') - \
-                        datetime.timedelta(minutes=16)
-            start_time = start_time.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-            query = query + " AND time < '" + utc_time + "'"
-            query = query + " AND time > '" + start_time + "'"
-            query = query + ' GROUP BY "mac" ORDER BY time DESC LIMIT 1'
-        elif sol_type == "SOL_TYPE_DUST_SNAPSHOT":
-            # compute time - 16min
-            start_time = datetime.datetime.strptime(
-                        utc_time, '%Y-%m-%dT%H:%M:%S.%fZ') - \
-                        datetime.timedelta(minutes=61)
-            start_time = start_time.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-            query = query + " AND time < '" + utc_time + "'"
-            query = query + " AND time > '" + start_time + "'"
-            query = query + ' GROUP BY "mac" ORDER BY time DESC LIMIT 1'
-        elif sol_type == "SOL_TYPE_SOLMANAGER_STATS":
-            query = query + ' GROUP BY "mac" ORDER BY time DESC LIMIT 1'
-        else:
-            query = query + ' GROUP BY "mac" ORDER BY time DESC'
-
-        # send query, parse the result and return the output in json
-        influx_json = self.influxClient.query(query).raw
-        j = ""
-        if len(influx_json) > 0:
-            j = self.sol.influxdb_to_json(influx_json)
-        return json.dumps(j)
 
     # decorator
     def _authorized_webhandler(func):
@@ -322,7 +247,7 @@ class JsonApiThread(threading.Thread):
 
         # http->bin
         try:
-            sol_binl = self.sol.http_to_bin(bottle.request.json)
+            sol_binl = sol.http_to_bin(bottle.request.json)
         except:
             return bottle.HTTPResponse(
                 body   = json.dumps(
@@ -337,11 +262,11 @@ class JsonApiThread(threading.Thread):
         for sol_bin in sol_binl:
 
             # convert bin->json
-            sol_json          = self.sol.bin_to_json(sol_bin)
+            sol_json          = sol.bin_to_json(sol_bin)
 
             # convert json->influxdb
             tags = self._get_tags(siteName, sol_json["mac"])
-            sol_influxdbl    += [self.sol.json_to_influxdb(sol_json, tags)]
+            sol_influxdbl    += [sol.json_to_influxdb(sol_json, tags)]
 
         # write to database
         try:
@@ -375,7 +300,7 @@ class JsonApiThread(threading.Thread):
     def _webhandle_status_GET(self, siteName=None):
         return {
                 'version solserver': solserver_version.VERSION,
-                'version Sol': SolVersion.VERSION,
+                'version Sol': list(sol.version()),
                 'uptime computer': self._exec_cmd('uptime'),
                 'utc': int(time.time()),
                 'date': time.strftime("%a, %d %b %Y %H:%M:%S", time.gmtime()),
@@ -403,72 +328,6 @@ class JsonApiThread(threading.Thread):
             self.set_action(action_json)
 
         return "Action OK"
-
-
-    # interaction with end user
-
-    def _webhandle_root_GET(self, filename="index.html"):
-        return bottle.static_file(filename, "www")
-
-    def _webhandle_map_GET(self, sitename, filename=""):
-        if filename == "":
-            return bottle.template("www/map", sitename=sitename)
-        else:
-            return bottle.static_file(filename, "www")
-
-    def _webhandle_mote_GET(self, mac):
-        """
-        Redirect to dynamic Grafana page
-        """
-        bottle.response.status = 303
-        redir_url  = "../../grafana/dashboard/db/dynamic?"
-        redir_url += "panelId=1&fullscreen&mac='{0}'".format(mac)
-        bottle.redirect(redir_url)
-
-    def _webhandle_jsonp_GET(self, site, sol_type, utc_time):
-        # clean inputs
-        clean = self._check_map_query(site)
-        clean = clean and self._check_map_query(sol_type)
-        clean = clean and self._check_map_query(utc_time)
-        if not clean:
-            return "Wrong parameters"
-
-        # build InfluxDB query
-        query = "SELECT * FROM " + sol_type
-        if site != "all":
-            query += " WHERE site = '" + site + "'"
-        else:
-            # select all sites
-            query += " WHERE site =~ //"
-        if sol_type == "SOL_TYPE_DUST_NOTIF_HRNEIGHBORS":
-            # compute time - 16min
-            start_time = datetime.datetime.strptime(
-                        utc_time, '%Y-%m-%dT%H:%M:%S.%fZ') - \
-                        datetime.timedelta(minutes=16)
-            start_time = start_time.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-            query += " AND time < '" + utc_time + "'"
-            query += " AND time > '" + start_time + "'"
-            query += ' GROUP BY "mac" ORDER BY time DESC LIMIT 1'
-        elif sol_type == "SOL_TYPE_DUST_SNAPSHOT":
-            # compute time - 16min
-            start_time = datetime.datetime.strptime(
-                        utc_time, '%Y-%m-%dT%H:%M:%S.%fZ') - \
-                        datetime.timedelta(minutes=61)
-            start_time = start_time.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-            query += " AND time < '" + utc_time + "'"
-            query += " AND time > '" + start_time + "'"
-            query += ' GROUP BY "mac" ORDER BY time DESC LIMIT 1'
-        elif sol_type == "SOL_TYPE_SOLMANAGER_STATS":
-            query += ' GROUP BY "mac" ORDER BY time DESC LIMIT 1'
-        else:
-            query += ' GROUP BY "mac" ORDER BY time DESC'
-
-        # send query, parse the result and return the output in json
-        influx_json = self.influxClient.query(query).raw
-        j = ""
-        if len(influx_json) > 0:
-            j = self.sol.influxdb_to_json(influx_json)
-        return json.dumps(j)
 
     #=== misc
 
@@ -499,7 +358,7 @@ class JsonApiThread(threading.Thread):
                 if site['token'] == token:
                     siteName = site["name"]
                     break
-            if (not siteName) and (searchAfterReload == False):
+            if (not siteName) and (searchAfterReload is False):
                 with open('solserver.sites', 'r') as f:
                     self.sites = json.load(f)["sites"]
                 searchAfterReload = True
@@ -511,25 +370,13 @@ class JsonApiThread(threading.Thread):
 
         return siteName
 
-    def _exec_cmd(self, cmd):
-        returnVal = None
+    @staticmethod
+    def _exec_cmd(cmd):
         try:
             returnVal = subprocess.check_output(cmd, shell=False)
         except subprocess.CalledProcessError:
             returnVal = "ERROR"
         return returnVal
-
-    def _check_map_query(self, query):
-        OK_CHARS = "abcdefghijklmnopqrstuvwxyz0123456789 _-.:%"
-        check = [x for x in query if x.lower() not in OK_CHARS] == []
-
-        # check for wrong keywords
-        WRONG_KEYWORDS = ["drop", "insert", "write"]
-        for word in WRONG_KEYWORDS:
-            if word in query.lower():
-                check = False
-
-        return check
 
 #======== main application thread
 
@@ -554,14 +401,15 @@ class SolServer(object):
             params                     = [],
             callback                   = self._clihandle_stats,
         )
-        self.cli.start()
 
-    def _clihandle_quit(self):
+    @staticmethod
+    def _clihandle_quit():
         time.sleep(.3)
         print "bye bye."
         # all threads as daemonic, will close automatically
 
-    def _clihandle_stats(self, params):
+    @staticmethod
+    def _clihandle_stats(params):
         stats = SolUtils.AppStats().get()
         output = []
         for k in sorted(stats.keys()):
@@ -569,11 +417,11 @@ class SolServer(object):
         output = '\n'.join(output)
         print output
 
-#============================ main ============================================
+# =========================== main ============================================
 
 
 def main():
-    solServer = SolServer()
+    SolServer()
 
 if __name__ == '__main__':
     main()
