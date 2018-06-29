@@ -64,21 +64,6 @@ ALLSTATS           = [
 
 class JsonApiThread(threading.Thread):
 
-    class HTTPSServer(bottle.ServerAdapter):
-        def run(self, handler):
-            from cheroot.wsgi import Server as WSGIServer
-            from cheroot.ssl.pyopenssl import pyOpenSSLAdapter
-            server = WSGIServer((self.host, self.port), handler)
-            server.ssl_adapter = pyOpenSSLAdapter(
-                certificate = SolUtils.AppConfig().get('solserver_certificate'),
-                private_key = SolUtils.AppConfig().get('solserver_private_key'),
-            )
-            try:
-                server.start()
-                log.info("Server started")
-            finally:
-                server.stop()
-
     def __init__(self):
 
         # local variables
@@ -131,7 +116,6 @@ class JsonApiThread(threading.Thread):
             self.web.run(
                 host   = '0.0.0.0',
                 port   = SolUtils.AppConfig().get('solserver_tcpport'),
-                server = self.HTTPSServer,
                 quiet  = True,
                 debug  = False,
             )
